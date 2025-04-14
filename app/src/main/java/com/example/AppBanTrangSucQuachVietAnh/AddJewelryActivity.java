@@ -186,7 +186,7 @@ public class AddJewelryActivity extends AppCompatActivity {
 
         // Get user ID from SharedPreferences
         SharedPreferences preferences = getSharedPreferences("user_prefs", MODE_PRIVATE);
-        int userId = preferences.getInt("user_id", -1);
+        int userId = 1;
         Log.d(TAG, "User ID from preferences: " + userId);
 
         if (userId == -1) {
