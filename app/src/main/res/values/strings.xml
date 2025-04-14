@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">App Ban Banh</string>
+    
+    <!-- Login strings -->
+    <string name="username">Tên đăng nhập</string>
+    <string name="password">Mật khẩu</string>
+    <string name="login">Đăng nhập</string>
+    
+    <!-- Menu strings -->
+    <string name="logout">Đăng xuất</string>
+    <string name="settings">Cài đặt</string>
+    <string name="refresh">Làm mới</string>
+    
+    <!-- Product management -->
+    <string name="add_product">Thêm sản phẩm</string>
+    <string name="edit_product">Sửa sản phẩm</string>
+    <string name="delete_product">Xóa sản phẩm</string>
+    <string name="product_name">Tên sản phẩm</string>
+    <string name="product_description">Mô tả</string>
+    <string name="product_price">Giá</string>
+    <string name="choose_image">Chọn ảnh</string>
+    <string name="save">Lưu</string>
+    <string name="cancel">Hủy</string>
+    <string name="permission_required">Cần quyền truy cập bộ nhớ để chọn ảnh</string>
+    <string name="error_empty_fields">Vui lòng điền đầy đủ thông tin</string>
+    <string name="error_invalid_price">Vui lòng nhập giá hợp lệ</string>
+    <string name="product_saved">Lưu sản phẩm thành công</string>
+    
+    <!-- Messages -->
+    <string name="msg_login_failed">Đăng nhập thất bại</string>
+    <string name="msg_enter_credentials">Vui lòng nhập đầy đủ thông tin</string>
+    <string name="msg_product_added">Thêm sản phẩm thành công</string>
+    <string name="msg_product_updated">Cập nhật sản phẩm thành công</string>
+    <string name="msg_product_deleted">Xóa sản phẩm thành công</string>
+    <string name="msg_error">Có lỗi xảy ra</string>
+    <string name="image_select_error">Không thể chọn ảnh</string>
+    <string name="image_save_error">Không thể lưu ảnh</string>
+    <string name="product_image">Ảnh sản phẩm</string>
+    <string name="description">Mô tả</string>
+    <string name="price">Giá</string>
+    <string name="success_product_saved">Lưu sản phẩm thành công</string>
+    <string name="error_saving_product">Lỗi khi lưu sản phẩm</string>
+</resources>
