@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Menu popup hiển thị khi nhấn vào nút FAB -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Tùy chọn thêm sản phẩm mới -->
+    <item
+        android:id="@+id/action_add"
+        android:icon="@android:drawable/ic_input_add"
+        android:title="Thêm sản phẩm mới" />
+    <!-- Tùy chọn đăng xuất khỏi ứng dụng -->
+    <item
+        android:id="@+id/action_logout"
+        android:icon="@android:drawable/ic_lock_power_off"
+        android:title="Đăng xuất" />
+</menu> 

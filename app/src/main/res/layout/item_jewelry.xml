@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="3dp"
+    app:cardCornerRadius="6dp"
+    app:cardElevation="2dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="4dp">
+
+        <ImageView
+            android:id="@+id/imageView"
+            android:layout_width="match_parent"
+            android:layout_height="90dp"
+            android:scaleType="centerCrop"
+            android:src="@drawable/ic_jewelry"
+            android:contentDescription="Jewelry image"/>
+
+        <TextView
+            android:id="@+id/textName"
+            android:layout_width="match_parent"
+            android:layout_height="32dp"
+            android:layout_marginTop="2dp"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:lineSpacingExtra="0dp"
+            android:gravity="top"/>
+
+        <TextView
+            android:id="@+id/textPrice"
+            android:layout_width="match_parent"
+            android:layout_height="16dp"
+            android:layout_marginTop="1dp"
+            android:textColor="@android:color/holo_red_dark"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:maxLines="1"
+            android:gravity="center_vertical"/>
+
+        <TextView
+            android:id="@+id/textCategory"
+            android:layout_width="match_parent"
+            android:layout_height="16dp"
+            android:layout_marginTop="1dp"
+            android:background="#F5F5F5"
+            android:padding="1dp"
+            android:textColor="#666666"
+            android:textSize="10sp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:gravity="center_vertical"/>
+
+        <TextView
+            android:id="@+id/textDescription"
+            android:layout_width="match_parent"
+            android:layout_height="36dp"
+            android:layout_marginTop="1dp"
+            android:ellipsize="end"
+            android:maxLines="3"
+            android:textSize="10sp"
+            android:textColor="#757575"
+            android:lineSpacingExtra="1dp"
+            android:gravity="top"/>
+
+        <TextView
+            android:id="@+id/textStock"
+            android:layout_width="match_parent"
+            android:layout_height="16dp"
+            android:layout_marginTop="1dp"
+            android:textSize="10sp"
+            android:textStyle="italic"
+            android:textColor="#757575"
+            android:maxLines="1"
+            android:gravity="center_vertical"/>
+
+        <Space
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"/>
+
+        <Button
+            android:id="@+id/buttonDelete"
+            android:layout_width="match_parent"
+            android:layout_height="28dp"
+            android:layout_marginTop="2dp"
+            android:backgroundTint="@android:color/holo_red_dark"
+            android:text="XÓA"
+            android:textColor="@android:color/white"
+            android:textSize="10sp"
+            android:padding="0dp"
+            style="@style/Widget.MaterialComponents.Button"/>
+
+    </LinearLayout>
+
+</androidx.cardview.widget.CardView> 
