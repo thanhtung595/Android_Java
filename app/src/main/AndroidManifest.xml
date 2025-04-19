@@ -36,6 +36,10 @@
         <activity
             android:name="com.example.AppBanTrangSucQuachVietAnh.EditJewelryActivity"
             android:exported="false" />
+
+        <activity
+            android:name="com.example.AppBanTrangSucQuachVietAnh.CartActivity"
+            android:exported="false" />
     </application>
 
 </manifest>

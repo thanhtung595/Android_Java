@@ -4,7 +4,10 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.util.Log;
 import com.example.AppBanTrangSucQuachVietAnh.model.Account;
+import com.example.AppBanTrangSucQuachVietAnh.model.CartItem;
 import com.example.AppBanTrangSucQuachVietAnh.model.Jewelry;
+import com.example.AppBanTrangSucQuachVietAnh.model.Order;
+import com.example.AppBanTrangSucQuachVietAnh.model.OrderDetail;
 import java.io.ByteArrayOutputStream;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
@@ -561,5 +564,242 @@ public class DatabaseManager {
         } catch (SQLException e) {
             Log.e(TAG, "Error closing resources: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * Thêm sản phẩm vào giỏ hàng
+     */
+    public boolean addToCart(CartItem cartItem) {
+        try {
+            if (!checkConnection()) {
+                Log.e(TAG, "Không thể kết nối đến database");
+                return false;
+            }
+
+            String sql = "INSERT INTO cart (user_id, product_id, quantity) VALUES (?, ?, ?)";
+            try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+                stmt.setInt(1, cartItem.getUserId());
+                stmt.setInt(2, cartItem.getProductId());
+                stmt.setInt(3, cartItem.getQuantity());
+                return stmt.executeUpdate() > 0;
+            }
+        } catch (SQLException e) {
+            Log.e(TAG, "Lỗi thêm vào giỏ hàng: " + e.getMessage(), e);
+            tryReconnect();
+            return false;
+        }
+    }
+
+    /**
+     * Lấy danh sách sản phẩm trong giỏ hàng của user
+     */
+    public List<CartItem> getCartItems(int userId) {
+        List<CartItem> cartItems = new ArrayList<>();
+        try {
+            if (!checkConnection()) {
+                Log.e(TAG, "Không thể kết nối đến database");
+                return cartItems;
+            }
+
+            String sql = "SELECT c.*, p.name as product_name, p.price as product_price, p.image as product_image " +
+                        "FROM cart c " +
+                        "JOIN products p ON c.product_id = p.id " +
+                        "WHERE c.user_id = ?";
+            try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+                stmt.setInt(1, userId);
+                try (ResultSet rs = stmt.executeQuery()) {
+                    while (rs.next()) {
+                        CartItem item = new CartItem();
+                        item.setId(rs.getInt("id"));
+                        item.setUserId(rs.getInt("user_id"));
+                        item.setProductId(rs.getInt("product_id"));
+                        item.setQuantity(rs.getInt("quantity"));
+                        item.setProductName(rs.getString("product_name"));
+                        item.setProductPrice(rs.getDouble("product_price"));
+                        item.setProductImage(rs.getBytes("product_image"));
+                        cartItems.add(item);
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            Log.e(TAG, "Lỗi lấy giỏ hàng: " + e.getMessage(), e);
+            tryReconnect();
+        }
+        return cartItems;
+    }
+
+    /**
+     * Cập nhật số lượng sản phẩm trong giỏ hàng
+     */
+    public boolean updateCartItemQuantity(int cartId, int quantity) {
+        try {
+            if (!checkConnection()) {
+                Log.e(TAG, "Không thể kết nối đến database");
+                return false;
+            }
+
+            String sql = "UPDATE cart SET quantity = ? WHERE id = ?";
+            try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+                stmt.setInt(1, quantity);
+                stmt.setInt(2, cartId);
+                return stmt.executeUpdate() > 0;
+            }
+        } catch (SQLException e) {
+            Log.e(TAG, "Lỗi cập nhật số lượng: " + e.getMessage(), e);
+            tryReconnect();
+            return false;
+        }
+    }
+
+    /**
+     * Xóa sản phẩm khỏi giỏ hàng
+     */
+    public boolean removeFromCart(int cartId) {
+        try {
+            if (!checkConnection()) {
+                Log.e(TAG, "Không thể kết nối đến database");
+                return false;
+            }
+
+            String sql = "DELETE FROM cart WHERE id = ?";
+            try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+                stmt.setInt(1, cartId);
+                return stmt.executeUpdate() > 0;
+            }
+        } catch (SQLException e) {
+            Log.e(TAG, "Lỗi xóa khỏi giỏ hàng: " + e.getMessage(), e);
+            tryReconnect();
+            return false;
+        }
+    }
+
+    /**
+     * Tạo đơn hàng mới từ giỏ hàng
+     */
+    public boolean createOrder(int userId, List<CartItem> cartItems) {
+        String orderSql = "INSERT INTO orders (user_id, total_amount) VALUES (?, ?)";
+        String detailSql = "INSERT INTO order_details (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)";
+        String clearCartSql = "DELETE FROM cart WHERE user_id = ?";
+        
+        double totalAmount = cartItems.stream()
+                .mapToDouble(CartItem::getSubtotal)
+                .sum();
+
+        try {
+            connection.setAutoCommit(false);
+            
+            // Tạo đơn hàng
+            int orderId;
+            try (PreparedStatement stmt = connection.prepareStatement(orderSql, Statement.RETURN_GENERATED_KEYS)) {
+                stmt.setInt(1, userId);
+                stmt.setDouble(2, totalAmount);
+                stmt.executeUpdate();
+                
+                try (ResultSet rs = stmt.getGeneratedKeys()) {
+                    if (rs.next()) {
+                        orderId = rs.getInt(1);
+                    } else {
+                        throw new SQLException("Không tạo được đơn hàng");
+                    }
+                }
+            }
+            
+            // Thêm chi tiết đơn hàng
+            try (PreparedStatement stmt = connection.prepareStatement(detailSql)) {
+                for (CartItem item : cartItems) {
+                    stmt.setInt(1, orderId);
+                    stmt.setInt(2, item.getProductId());
+                    stmt.setInt(3, item.getQuantity());
+                    stmt.setDouble(4, item.getProductPrice());
+                    stmt.executeUpdate();
+                }
+            }
+            
+            // Xóa giỏ hàng
+            try (PreparedStatement stmt = connection.prepareStatement(clearCartSql)) {
+                stmt.setInt(1, userId);
+                stmt.executeUpdate();
+            }
+            
+            connection.commit();
+            return true;
+        } catch (SQLException e) {
+            try {
+                connection.rollback();
+            } catch (SQLException ex) {
+                Log.e(TAG, "Lỗi rollback: " + ex.getMessage(), ex);
+            }
+            Log.e(TAG, "Lỗi tạo đơn hàng: " + e.getMessage(), e);
+            return false;
+        } finally {
+            try {
+                connection.setAutoCommit(true);
+            } catch (SQLException e) {
+                Log.e(TAG, "Lỗi set auto commit: " + e.getMessage(), e);
+            }
+        }
+    }
+
+    /**
+     * Lấy danh sách đơn hàng của user
+     */
+    public List<Order> getUserOrders(int userId) {
+        List<Order> orders = new ArrayList<>();
+        String sql = "SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC";
+        
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setInt(1, userId);
+            
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    Order order = new Order();
+                    order.setId(rs.getInt("id"));
+                    order.setUserId(rs.getInt("user_id"));
+                    order.setTotalAmount(rs.getDouble("total_amount"));
+                    order.setStatus(rs.getString("status"));
+                    order.setCreatedAt(rs.getTimestamp("created_at"));
+                    order.setUpdatedAt(rs.getTimestamp("updated_at"));
+                    
+                    // Lấy chi tiết đơn hàng
+                    order.setOrderDetails(getOrderDetails(order.getId()));
+                    orders.add(order);
+                }
+            }
+        } catch (SQLException e) {
+            Log.e(TAG, "Lỗi lấy danh sách đơn hàng: " + e.getMessage(), e);
+        }
+        return orders;
+    }
+
+    /**
+     * Lấy chi tiết của một đơn hàng
+     */
+    private List<OrderDetail> getOrderDetails(int orderId) {
+        List<OrderDetail> details = new ArrayList<>();
+        String sql = "SELECT od.*, p.name as product_name, p.image as product_image " +
+                    "FROM order_details od " +
+                    "JOIN products p ON od.product_id = p.id " +
+                    "WHERE od.order_id = ?";
+        
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setInt(1, orderId);
+            
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    OrderDetail detail = new OrderDetail();
+                    detail.setId(rs.getInt("id"));
+                    detail.setOrderId(rs.getInt("order_id"));
+                    detail.setProductId(rs.getInt("product_id"));
+                    detail.setQuantity(rs.getInt("quantity"));
+                    detail.setPrice(rs.getDouble("price"));
+                    detail.setProductName(rs.getString("product_name"));
+                    detail.setProductImage(rs.getBytes("product_image"));
+                    details.add(detail);
+                }
+            }
+        } catch (SQLException e) {
+            Log.e(TAG, "Lỗi lấy chi tiết đơn hàng: " + e.getMessage(), e);
+        }
+        return details;
     }
 } 

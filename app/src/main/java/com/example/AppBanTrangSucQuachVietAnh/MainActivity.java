@@ -16,13 +16,19 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.appcompat.widget.SearchView;
+import android.widget.ImageButton;
+import android.widget.Button;
+import android.widget.EditText;
 
 import com.example.AppBanTrangSucQuachVietAnh.adapter.JewelryAdapter;
 import com.example.AppBanTrangSucQuachVietAnh.data.DatabaseManager;
 import com.example.AppBanTrangSucQuachVietAnh.model.Jewelry;
+import com.example.AppBanTrangSucQuachVietAnh.model.CartItem;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import java.util.List;
 import java.util.Locale;
+import java.text.NumberFormat;
 
 /**
  * Activity chính của ứng dụng hiển thị danh sách sản phẩm trang sức.
@@ -61,13 +67,14 @@ public class MainActivity extends AppCompatActivity {
         // Khởi tạo đối tượng quản lý cơ sở dữ liệu
         databaseManager = DatabaseManager.getInstance();
 
-        // Kiểm tra đăng nhập
+        // Lấy thông tin đăng nhập từ SharedPreferences
         SharedPreferences prefs = getSharedPreferences("login_prefs", MODE_PRIVATE);
-        String username = prefs.getString("username", null);
-        String password = prefs.getString("password", null);
-        String role = prefs.getString("user_role", null);
+        String username = prefs.getString("username", "");
+        String password = prefs.getString("password", "");
+        String userRole = prefs.getString("user_role", "");
+        userId = prefs.getInt("user_id", -1);
 
-        if (username == null || password == null || role == null) {
+        if (username.isEmpty() || password.isEmpty()) {
             Log.d(TAG, "Chưa đăng nhập, chuyển đến LoginActivity");
             startActivity(new Intent(this, LoginActivity.class));
             finish();
@@ -75,8 +82,8 @@ public class MainActivity extends AppCompatActivity {
         }
 
         // Kiểm tra quyền admin
-        boolean isAdmin = "admin".equals(role);
-        Log.d(TAG, "Quyền người dùng: " + role + ", là admin: " + isAdmin);
+        boolean isAdmin = "admin".equals(userRole);
+        Log.d(TAG, "Quyền người dùng: " + userRole + ", là admin: " + isAdmin);
 
         // Đã đăng nhập, tiếp tục khởi tạo MainActivity
         initToolbar();
@@ -130,9 +137,13 @@ public class MainActivity extends AppCompatActivity {
                 // Xử lý sự kiện click vào item
                 jewelry -> {
                     Log.d(TAG, "Click vào sản phẩm: " + jewelry.getId());
-                    Intent intent = new Intent(this, EditJewelryActivity.class);
-                    intent.putExtra("jewelry", jewelry);
-                    startActivity(intent);
+                    if (isAdmin) {
+                        Intent intent = new Intent(this, EditJewelryActivity.class);
+                        intent.putExtra("jewelry", jewelry);
+                        startActivity(intent);
+                    } else {
+                        showAddToCartDialog(jewelry);
+                    }
                 }
             );
             
@@ -307,6 +318,12 @@ public class MainActivity extends AppCompatActivity {
             finish();
             return true;
         }
+        if (item.getItemId() == R.id.menu_cart) {
+            Intent intent = new Intent(this, CartActivity.class);
+            intent.putExtra("user_id", userId);
+            startActivity(intent);
+            return true;
+        }
         return super.onOptionsItemSelected(item);
     }
 
@@ -316,6 +333,37 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.menu_main, menu);
+        
+        // Thêm menu giỏ hàng cho user
+        if (!isAdmin) {
+            menu.add(Menu.NONE, R.id.menu_cart, Menu.NONE, "Giỏ hàng")
+                .setIcon(android.R.drawable.ic_menu_more)
+                .setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
+        }
+
+        // Thiết lập SearchView
+        MenuItem searchItem = menu.findItem(R.id.action_search);
+        if (searchItem != null) {
+            SearchView searchView = (SearchView) searchItem.getActionView();
+            if (searchView != null) {
+                searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+                    @Override
+                    public boolean onQueryTextSubmit(String query) {
+                        searchJewelry(query);
+                        return true;
+                    }
+
+                    @Override
+                    public boolean onQueryTextChange(String newText) {
+                        if (newText.isEmpty()) {
+                            loadJewelryData();
+                        }
+                        return true;
+                    }
+                });
+            }
+        }
+
         return true;
     }
 
@@ -347,6 +395,80 @@ public class MainActivity extends AppCompatActivity {
                     Toast.makeText(this, "Lỗi khi xóa sản phẩm: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                 });
             }
+        }).start();
+    }
+
+    private void showAddToCartDialog(Jewelry jewelry) {
+        View dialogView = getLayoutInflater().inflate(R.layout.dialog_add_to_cart, null);
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setView(dialogView)
+                .create();
+
+        TextView textProductName = dialogView.findViewById(R.id.textProductName);
+        TextView textProductPrice = dialogView.findViewById(R.id.textProductPrice);
+        TextView textStock = dialogView.findViewById(R.id.textStock);
+        EditText editQuantity = dialogView.findViewById(R.id.editQuantity);
+        ImageButton buttonDecrease = dialogView.findViewById(R.id.buttonDecrease);
+        ImageButton buttonIncrease = dialogView.findViewById(R.id.buttonIncrease);
+        Button buttonAddToCart = dialogView.findViewById(R.id.buttonAddToCart);
+
+        // Hiển thị thông tin sản phẩm
+        textProductName.setText(jewelry.getName());
+        NumberFormat currencyFormat = NumberFormat.getCurrencyInstance(new Locale("vi", "VN"));
+        textProductPrice.setText(currencyFormat.format(jewelry.getPrice()));
+        textStock.setText("Còn lại: " + jewelry.getStock());
+
+        // Xử lý tăng giảm số lượng
+        buttonDecrease.setOnClickListener(v -> {
+            int quantity = Integer.parseInt(editQuantity.getText().toString());
+            if (quantity > 1) {
+                editQuantity.setText(String.valueOf(quantity - 1));
+            }
+        });
+
+        buttonIncrease.setOnClickListener(v -> {
+            int quantity = Integer.parseInt(editQuantity.getText().toString());
+            if (quantity < jewelry.getStock()) {
+                editQuantity.setText(String.valueOf(quantity + 1));
+            }
+        });
+
+        // Xử lý thêm vào giỏ hàng
+        buttonAddToCart.setOnClickListener(v -> {
+            int quantity = Integer.parseInt(editQuantity.getText().toString());
+            if (quantity > jewelry.getStock()) {
+                Toast.makeText(this, "Số lượng vượt quá tồn kho", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            CartItem cartItem = new CartItem(userId, jewelry.getId(), quantity);
+            new Thread(() -> {
+                boolean success = databaseManager.addToCart(cartItem);
+                runOnUiThread(() -> {
+                    if (success) {
+                        Toast.makeText(this, "Đã thêm vào giỏ hàng", Toast.LENGTH_SHORT).show();
+                        dialog.dismiss();
+                    } else {
+                        Toast.makeText(this, "Lỗi thêm vào giỏ hàng", Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }).start();
+        });
+
+        dialog.show();
+    }
+
+    private void searchJewelry(String keyword) {
+        new Thread(() -> {
+            List<Jewelry> results = databaseManager.searchJewelry(keyword);
+            runOnUiThread(() -> {
+                if (results.isEmpty()) {
+                    showEmptyView();
+                } else {
+                    hideEmptyView();
+                    adapter.updateData(results);
+                }
+            });
         }).start();
     }
 

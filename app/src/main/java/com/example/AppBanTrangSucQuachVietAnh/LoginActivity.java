@@ -76,7 +76,7 @@ public class LoginActivity extends AppCompatActivity {
                     hideProgressDialog();
                     if (account != null) {
                         // Lưu thông tin đăng nhập
-                        saveLoginInfo(username, password, account.getRole());
+                        saveLoginInfo(username, password, account.getRole(), account);
                         startMainActivity();
                     } else {
                         Toast.makeText(LoginActivity.this, 
@@ -96,13 +96,14 @@ public class LoginActivity extends AppCompatActivity {
     /**
      * Lưu thông tin đăng nhập vào SharedPreferences
      */
-    private void saveLoginInfo(String username, String password, String role) {
+    private void saveLoginInfo(String username, String password, String role, Account account) {
         SharedPreferences.Editor editor = getSharedPreferences("login_prefs", MODE_PRIVATE).edit();
         editor.putString("username", username);
         editor.putString("password", password);
         editor.putString("user_role", role);
+        editor.putInt("user_id", account.getId());
         editor.apply();
-        Log.d(TAG, "Đã lưu thông tin đăng nhập: " + username + ", quyền: " + role);
+        Log.d(TAG, "Đã lưu thông tin đăng nhập: " + username + ", quyền: " + role + ", ID: " + account.getId());
     }
 
     /**
