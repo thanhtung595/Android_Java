@@ -21,6 +21,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
+/**
+ * Activity hiển thị và quản lý giỏ hàng của người dùng
+ * Cho phép xem, cập nhật số lượng và thanh toán các sản phẩm trong giỏ hàng
+ */
 public class CartActivity extends AppCompatActivity implements CartAdapter.CartItemListener {
     private static final String TAG = "CartActivity";
     
@@ -33,54 +37,63 @@ public class CartActivity extends AppCompatActivity implements CartAdapter.CartI
     private List<CartItem> cartItems;
     private int userId;
 
+    /**
+     * Khởi tạo Activity và các thành phần giao diện
+     * @param savedInstanceState Trạng thái đã lưu của Activity
+     */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_cart);
 
-        // Khởi tạo DatabaseManager
-        databaseManager = DatabaseManager.getInstance();
-
-        // Lấy user ID từ Intent
-        userId = getIntent().getIntExtra("user_id", -1);
-        if (userId == -1) {
-            Toast.makeText(this, "Lỗi: Không có thông tin người dùng", Toast.LENGTH_SHORT).show();
-            finish();
-            return;
-        }
-
-        initViews();
-        setupToolbar();
+        // Khởi tạo các thành phần
+        initializeComponents();
+        
+        // Lấy thông tin user từ SharedPreferences
+        loadUserInfo();
+        
+        // Thiết lập RecyclerView và Adapter
         setupRecyclerView();
+        
+        // Tải danh sách sản phẩm trong giỏ hàng
         loadCartItems();
     }
 
-    private void initViews() {
+    /**
+     * Khởi tạo các thành phần giao diện và đối tượng cần thiết
+     */
+    private void initializeComponents() {
         recyclerView = findViewById(R.id.recyclerView);
         emptyView = findViewById(R.id.emptyView);
         textTotalAmount = findViewById(R.id.textTotalAmount);
         buttonCheckout = findViewById(R.id.buttonCheckout);
-
-        buttonCheckout.setOnClickListener(v -> checkout());
-    }
-
-    private void setupToolbar() {
-        Toolbar toolbar = findViewById(R.id.toolbar);
-        setSupportActionBar(toolbar);
-        if (getSupportActionBar() != null) {
-            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-            getSupportActionBar().setDisplayShowHomeEnabled(true);
-        }
-        toolbar.setNavigationOnClickListener(v -> onBackPressed());
-    }
-
-    private void setupRecyclerView() {
+        databaseManager = DatabaseManager.getInstance();
         cartItems = new ArrayList<>();
+    }
+
+    /**
+     * Lấy thông tin user từ SharedPreferences
+     */
+    private void loadUserInfo() {
+        userId = getSharedPreferences("login_prefs", MODE_PRIVATE).getInt("user_id", -1);
+        if (userId == -1) {
+            Toast.makeText(this, "Lỗi: Không có thông tin người dùng", Toast.LENGTH_SHORT).show();
+            finish();
+        }
+    }
+
+    /**
+     * Thiết lập RecyclerView và Adapter
+     */
+    private void setupRecyclerView() {
         adapter = new CartAdapter(cartItems, this);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         recyclerView.setAdapter(adapter);
     }
 
+    /**
+     * Tải danh sách sản phẩm trong giỏ hàng từ database
+     */
     private void loadCartItems() {
         new Thread(() -> {
             List<CartItem> items = databaseManager.getCartItems(userId);
@@ -94,6 +107,9 @@ public class CartActivity extends AppCompatActivity implements CartAdapter.CartI
         }).start();
     }
 
+    /**
+     * Cập nhật tổng tiền của giỏ hàng
+     */
     private void updateTotalAmount() {
         double total = cartItems.stream()
                 .mapToDouble(CartItem::getSubtotal)
@@ -115,15 +131,40 @@ public class CartActivity extends AppCompatActivity implements CartAdapter.CartI
         }
     }
 
+    /**
+     * Xử lý sự kiện khi nhấn nút thanh toán
+     * @param view View được nhấn
+     */
+    public void onCheckoutClick(View view) {
+        if (cartItems.isEmpty()) {
+            Toast.makeText(this, "Giỏ hàng trống", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Xác nhận thanh toán");
+        builder.setMessage("Bạn có chắc chắn muốn thanh toán đơn hàng này?");
+        
+        builder.setPositiveButton("Xác nhận", (dialog, which) -> {
+            checkout();
+        });
+        
+        builder.setNegativeButton("Hủy", null);
+        builder.show();
+    }
+
+    /**
+     * Thực hiện thanh toán đơn hàng
+     */
     private void checkout() {
         new Thread(() -> {
             boolean success = databaseManager.createOrder(userId, cartItems);
             runOnUiThread(() -> {
                 if (success) {
-                    Toast.makeText(this, "Đặt hàng thành công", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Thanh toán thành công", Toast.LENGTH_SHORT).show();
                     finish();
                 } else {
-                    Toast.makeText(this, "Lỗi khi đặt hàng", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Thanh toán thất bại", Toast.LENGTH_SHORT).show();
                 }
             });
         }).start();
@@ -139,7 +180,7 @@ public class CartActivity extends AppCompatActivity implements CartAdapter.CartI
                     adapter.updateData(cartItems);
                     updateTotalAmount();
                 } else {
-                    Toast.makeText(this, "Lỗi cập nhật số lượng", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Cập nhật số lượng thất bại", Toast.LENGTH_SHORT).show();
                 }
             });
         }).start();
@@ -156,12 +197,15 @@ public class CartActivity extends AppCompatActivity implements CartAdapter.CartI
                     updateTotalAmount();
                     updateEmptyView();
                 } else {
-                    Toast.makeText(this, "Lỗi xóa sản phẩm", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Xóa sản phẩm thất bại", Toast.LENGTH_SHORT).show();
                 }
             });
         }).start();
     }
 
+    /**
+     * Xử lý khi Activity bị hủy
+     */
     @Override
     protected void onDestroy() {
         super.onDestroy();

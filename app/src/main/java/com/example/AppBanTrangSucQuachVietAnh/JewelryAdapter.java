@@ -15,21 +15,47 @@ import com.example.AppBanTrangSucQuachVietAnh.model.Jewelry;
 
 import java.util.List;
 
+/**
+ * Adapter cho RecyclerView hiển thị danh sách sản phẩm trang sức
+ * Xử lý hiển thị thông tin sản phẩm và các sự kiện tương tác
+ */
 public class JewelryAdapter extends RecyclerView.Adapter<JewelryAdapter.JewelryViewHolder> {
 
+    private static final String TAG = "JewelryAdapter";
     private List<Jewelry> jewelryList;
     private OnItemClickListener listener;
 
-    // Interface for click events
+    /**
+     * Interface định nghĩa sự kiện khi click vào một sản phẩm
+     */
     public interface OnItemClickListener {
         void onItemClick(Jewelry jewelry);
         void onDeleteClick(Jewelry jewelry);
     }
 
+    /**
+     * Constructor của JewelryAdapter
+     * @param jewelryList Danh sách sản phẩm cần hiển thị
+     */
     public JewelryAdapter(List<Jewelry> jewelryList) {
         this.jewelryList = jewelryList;
     }
 
+    /**
+     * Cập nhật danh sách sản phẩm
+     * @param newList Danh sách sản phẩm mới
+     */
+    public void setJewelryList(List<Jewelry> newList) {
+        this.jewelryList = newList;
+        notifyDataSetChanged();
+    }
+
+    /**
+     * Tạo ViewHolder mới
+     * @param parent ViewGroup chứa các item
+     * @param viewType Loại view
+     * @return ViewHolder mới
+     */
     @NonNull
     @Override
     public JewelryViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -37,6 +63,11 @@ public class JewelryAdapter extends RecyclerView.Adapter<JewelryAdapter.JewelryV
         return new JewelryViewHolder(view);
     }
 
+    /**
+     * Gắn dữ liệu vào ViewHolder
+     * @param holder ViewHolder cần gắn dữ liệu
+     * @param position Vị trí của item trong danh sách
+     */
     @Override
     public void onBindViewHolder(@NonNull JewelryViewHolder holder, int position) {
         Jewelry jewelry = jewelryList.get(position);
@@ -66,6 +97,10 @@ public class JewelryAdapter extends RecyclerView.Adapter<JewelryAdapter.JewelryV
         });
     }
 
+    /**
+     * Lấy số lượng item trong danh sách
+     * @return Số lượng item
+     */
     @Override
     public int getItemCount() {
         return jewelryList.size();
@@ -75,6 +110,10 @@ public class JewelryAdapter extends RecyclerView.Adapter<JewelryAdapter.JewelryV
         this.listener = listener;
     }
 
+    /**
+     * ViewHolder cho item sản phẩm
+     * Chứa các view hiển thị thông tin sản phẩm
+     */
     public static class JewelryViewHolder extends RecyclerView.ViewHolder {
         public TextView textName;
         public TextView textPrice;
@@ -82,6 +121,10 @@ public class JewelryAdapter extends RecyclerView.Adapter<JewelryAdapter.JewelryV
         public ImageView imageView;
         public Button buttonDelete;
 
+        /**
+         * Constructor của ViewHolder
+         * @param itemView View của item
+         */
         public JewelryViewHolder(@NonNull View itemView) {
             super(itemView);
             textName = itemView.findViewById(R.id.textName);

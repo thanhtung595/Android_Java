@@ -1,95 +1,141 @@
 package com.example.AppBanTrangSucQuachVietAnh;
 
 import android.os.Bundle;
-import android.view.View;
-import android.widget.LinearLayout;
+import android.util.Log;
+import android.view.MenuItem;
+import android.widget.TextView;
 import android.widget.Toast;
-
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-
-import com.example.AppBanTrangSucQuachVietAnh.adapter.OrderAdapter;
+import com.example.AppBanTrangSucQuachVietAnh.adapter.OrderHistoryAdapter;
 import com.example.AppBanTrangSucQuachVietAnh.data.DatabaseManager;
 import com.example.AppBanTrangSucQuachVietAnh.model.Order;
-
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.text.NumberFormat;
 
+/**
+ * Activity hiển thị lịch sử đơn hàng của người dùng
+ * Cho phép xem chi tiết các đơn hàng đã mua
+ */
 public class OrderHistoryActivity extends AppCompatActivity {
     private static final String TAG = "OrderHistoryActivity";
-    
     private RecyclerView recyclerView;
-    private OrderAdapter adapter;
-    private LinearLayout emptyView;
+    private OrderHistoryAdapter adapter;
     private DatabaseManager databaseManager;
-    private List<Order> orders;
     private int userId;
 
+    /**
+     * Khởi tạo Activity và các thành phần giao diện
+     * @param savedInstanceState Trạng thái đã lưu của Activity
+     */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_order_history);
 
-        // Khởi tạo DatabaseManager
-        databaseManager = DatabaseManager.getInstance();
-
-        // Lấy user ID từ Intent
-        userId = getIntent().getIntExtra("user_id", -1);
-        if (userId == -1) {
-            Toast.makeText(this, "Lỗi: Không có thông tin người dùng", Toast.LENGTH_SHORT).show();
-            finish();
-            return;
-        }
-
-        initViews();
-        setupToolbar();
+        // Khởi tạo các thành phần
+        initializeComponents();
+        
+        // Lấy thông tin user từ SharedPreferences
+        loadUserInfo();
+        
+        // Thiết lập RecyclerView và Adapter
         setupRecyclerView();
+        
+        // Tải danh sách đơn hàng
         loadOrders();
     }
 
-    private void initViews() {
+    /**
+     * Khởi tạo các thành phần giao diện và đối tượng cần thiết
+     */
+    private void initializeComponents() {
         recyclerView = findViewById(R.id.recyclerView);
-        emptyView = findViewById(R.id.emptyView);
+        databaseManager = DatabaseManager.getInstance();
     }
 
-    private void setupToolbar() {
-        Toolbar toolbar = findViewById(R.id.toolbar);
-        setSupportActionBar(toolbar);
-        if (getSupportActionBar() != null) {
-            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-            getSupportActionBar().setDisplayShowHomeEnabled(true);
+    /**
+     * Lấy thông tin user từ SharedPreferences
+     */
+    private void loadUserInfo() {
+        userId = getSharedPreferences("login_prefs", MODE_PRIVATE).getInt("user_id", -1);
+        if (userId == -1) {
+            Log.e(TAG, "Không tìm thấy user ID");
+            Toast.makeText(this, "Lỗi: Không tìm thấy thông tin người dùng", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
         }
-        toolbar.setNavigationOnClickListener(v -> onBackPressed());
     }
 
+    /**
+     * Thiết lập RecyclerView và Adapter
+     */
     private void setupRecyclerView() {
-        orders = new ArrayList<>();
-        adapter = new OrderAdapter(orders);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
+        adapter = new OrderHistoryAdapter(this);
         recyclerView.setAdapter(adapter);
     }
 
+    /**
+     * Tải danh sách đơn hàng
+     */
     private void loadOrders() {
         new Thread(() -> {
-            List<Order> userOrders = databaseManager.getUserOrders(userId);
-            runOnUiThread(() -> {
-                orders.clear();
-                orders.addAll(userOrders);
-                adapter.notifyDataSetChanged();
-                updateEmptyView();
-            });
+            try {
+                // Kiểm tra kết nối
+                if (!databaseManager.checkConnection()) {
+                    runOnUiThread(() -> {
+                        Toast.makeText(this, "Lỗi: Không thể kết nối cơ sở dữ liệu", Toast.LENGTH_SHORT).show();
+                        finish();
+                    });
+                    return;
+                }
+
+                List<Order> orders = databaseManager.getUserOrders(userId);
+                runOnUiThread(() -> {
+                    if (orders != null && !orders.isEmpty()) {
+                        adapter.setOrders(orders);
+                    } else {
+                        TextView textEmpty = findViewById(R.id.textEmpty);
+                        textEmpty.setText("Bạn chưa có đơn hàng nào");
+                        textEmpty.setVisibility(TextView.VISIBLE);
+                    }
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "Lỗi tải lịch sử mua hàng: " + e.getMessage());
+                runOnUiThread(() -> {
+                    Toast.makeText(this, "Lỗi: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                });
+            }
         }).start();
     }
 
-    private void updateEmptyView() {
-        if (orders.isEmpty()) {
-            recyclerView.setVisibility(View.GONE);
-            emptyView.setVisibility(View.VISIBLE);
-        } else {
-            recyclerView.setVisibility(View.VISIBLE);
-            emptyView.setVisibility(View.GONE);
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == android.R.id.home) {
+            onBackPressed();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
+    @Override
+    public void onBackPressed() {
+        super.onBackPressed();
+        finish();
+    }
+
+    /**
+     * Xử lý khi Activity bị hủy
+     */
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (databaseManager != null) {
+            databaseManager.close();
         }
     }
 } 

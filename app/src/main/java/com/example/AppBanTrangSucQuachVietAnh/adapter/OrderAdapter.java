@@ -2,6 +2,7 @@ package com.example.AppBanTrangSucQuachVietAnh.adapter;
 
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Color;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -20,17 +21,42 @@ import java.text.SimpleDateFormat;
 import java.util.List;
 import java.util.Locale;
 
+/**
+ * Adapter cho RecyclerView hiển thị danh sách đơn hàng
+ * Xử lý hiển thị thông tin đơn hàng và các sự kiện tương tác
+ */
 public class OrderAdapter extends RecyclerView.Adapter<OrderAdapter.OrderViewHolder> {
+    private static final String TAG = "OrderAdapter";
     private List<Order> orders;
     private final NumberFormat currencyFormat;
     private final SimpleDateFormat dateFormat;
+    private OnItemClickListener listener;
 
-    public OrderAdapter(List<Order> orders) {
+    /**
+     * Interface định nghĩa các sự kiện tương tác với đơn hàng
+     */
+    public interface OnItemClickListener {
+        void onOrderClick(Order order);
+    }
+
+    /**
+     * Constructor của OrderAdapter
+     * @param orders Danh sách đơn hàng
+     * @param listener Listener xử lý các sự kiện
+     */
+    public OrderAdapter(List<Order> orders, OnItemClickListener listener) {
         this.orders = orders;
+        this.listener = listener;
         this.currencyFormat = NumberFormat.getCurrencyInstance(new Locale("vi", "VN"));
         this.dateFormat = new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault());
     }
 
+    /**
+     * Tạo ViewHolder mới
+     * @param parent ViewGroup chứa các item
+     * @param viewType Loại view
+     * @return ViewHolder mới
+     */
     @NonNull
     @Override
     public OrderViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -38,14 +64,15 @@ public class OrderAdapter extends RecyclerView.Adapter<OrderAdapter.OrderViewHol
         return new OrderViewHolder(view);
     }
 
+    /**
+     * Gắn dữ liệu vào ViewHolder
+     * @param holder ViewHolder cần gắn dữ liệu
+     * @param position Vị trí của item trong danh sách
+     */
     @Override
     public void onBindViewHolder(@NonNull OrderViewHolder holder, int position) {
         Order order = orders.get(position);
-
-        holder.textOrderId.setText(String.valueOf(order.getId()));
-        holder.textStatus.setText(order.getStatus());
-        holder.textDate.setText(dateFormat.format(order.getCreatedAt()));
-        holder.textTotalAmount.setText(currencyFormat.format(order.getTotalAmount()));
+        holder.bind(order, listener);
 
         // Set up order details RecyclerView
         OrderDetailAdapter detailAdapter = new OrderDetailAdapter(order.getOrderDetails());
@@ -53,11 +80,19 @@ public class OrderAdapter extends RecyclerView.Adapter<OrderAdapter.OrderViewHol
         holder.recyclerViewOrderDetails.setAdapter(detailAdapter);
     }
 
+    /**
+     * Lấy số lượng item trong danh sách
+     * @return Số lượng item
+     */
     @Override
     public int getItemCount() {
         return orders.size();
     }
 
+    /**
+     * ViewHolder cho item đơn hàng
+     * Chứa các view hiển thị thông tin đơn hàng
+     */
     public static class OrderViewHolder extends RecyclerView.ViewHolder {
         public TextView textOrderId;
         public TextView textStatus;
@@ -65,6 +100,10 @@ public class OrderAdapter extends RecyclerView.Adapter<OrderAdapter.OrderViewHol
         public TextView textTotalAmount;
         public RecyclerView recyclerViewOrderDetails;
 
+        /**
+         * Constructor của ViewHolder
+         * @param itemView View của item
+         */
         public OrderViewHolder(@NonNull View itemView) {
             super(itemView);
             textOrderId = itemView.findViewById(R.id.textOrderId);
@@ -72,6 +111,49 @@ public class OrderAdapter extends RecyclerView.Adapter<OrderAdapter.OrderViewHol
             textDate = itemView.findViewById(R.id.textDate);
             textTotalAmount = itemView.findViewById(R.id.textTotalAmount);
             recyclerViewOrderDetails = itemView.findViewById(R.id.recyclerViewOrderDetails);
+        }
+
+        /**
+         * Gắn dữ liệu đơn hàng vào các view
+         * @param order Đơn hàng cần hiển thị
+         * @param listener Listener xử lý các sự kiện
+         */
+        public void bind(Order order, OnItemClickListener listener) {
+            // Hiển thị thông tin đơn hàng
+            textOrderId.setText(String.valueOf(order.getId()));
+            textStatus.setText(order.getStatus());
+            textDate.setText(dateFormat.format(order.getCreatedAt()));
+            textTotalAmount.setText(currencyFormat.format(order.getTotalAmount()));
+            
+            // Hiển thị trạng thái đơn hàng
+            String statusText;
+            int statusColor;
+            switch (order.getStatus()) {
+                case Order.STATUS_PENDING:
+                    statusText = "Đang xử lý";
+                    statusColor = Color.YELLOW;
+                    break;
+                case Order.STATUS_COMPLETED:
+                    statusText = "Đã hoàn thành";
+                    statusColor = Color.GREEN;
+                    break;
+                case Order.STATUS_CANCELLED:
+                    statusText = "Đã hủy";
+                    statusColor = Color.RED;
+                    break;
+                default:
+                    statusText = "Không xác định";
+                    statusColor = Color.GRAY;
+            }
+            textStatus.setText(statusText);
+            textStatus.setTextColor(statusColor);
+
+            // Xử lý sự kiện click vào đơn hàng
+            itemView.setOnClickListener(v -> {
+                if (listener != null) {
+                    listener.onOrderClick(order);
+                }
+            });
         }
     }
 

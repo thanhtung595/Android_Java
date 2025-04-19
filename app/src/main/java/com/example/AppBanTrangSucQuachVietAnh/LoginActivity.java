@@ -14,43 +14,49 @@ import com.example.AppBanTrangSucQuachVietAnh.data.DatabaseManager;
 import com.example.AppBanTrangSucQuachVietAnh.model.Account;
 
 /**
- * Activity xử lý đăng nhập người dùng
- * Kiểm tra thông tin đăng nhập và phân quyền người dùng (admin/user)
+ * Activity xử lý đăng nhập của ứng dụng
+ * Cho phép người dùng đăng nhập vào hệ thống với tài khoản đã đăng ký
  */
 public class LoginActivity extends AppCompatActivity {
     private static final String TAG = "LoginActivity";
     private EditText editUsername;
     private EditText editPassword;
-    private Button buttonLogin;
-    private DatabaseManager databaseManager;
-    private ProgressDialog progressDialog;
+    private Button btnLogin;
+    private DatabaseManager dbManager;
+    private SharedPreferences prefs;
 
+    /**
+     * Khởi tạo Activity và các thành phần giao diện
+     * @param savedInstanceState Trạng thái đã lưu của Activity
+     */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_login);
-        Log.d(TAG, "Khởi tạo LoginActivity");
 
-        // Khởi tạo DatabaseManager
-        databaseManager = DatabaseManager.getInstance();
-
-        // Khởi tạo các view
-        initViews();
-        Log.d(TAG, "Đã khởi tạo các view thành công");
+        // Khởi tạo các thành phần
+        initializeComponents();
+        
+        // Thiết lập sự kiện cho nút đăng nhập
+        setupLoginButton();
     }
 
     /**
-     * Khởi tạo các thành phần giao diện
+     * Khởi tạo các thành phần giao diện và đối tượng cần thiết
      */
-    private void initViews() {
+    private void initializeComponents() {
         editUsername = findViewById(R.id.editUsername);
         editPassword = findViewById(R.id.editPassword);
-        buttonLogin = findViewById(R.id.buttonLogin);
-        progressDialog = new ProgressDialog(this);
-        progressDialog.setMessage("Đang đăng nhập...");
-        progressDialog.setCancelable(false);
+        btnLogin = findViewById(R.id.btnLogin);
+        dbManager = DatabaseManager.getInstance();
+        prefs = getSharedPreferences("login_prefs", MODE_PRIVATE);
+    }
 
-        buttonLogin.setOnClickListener(v -> {
+    /**
+     * Thiết lập sự kiện cho nút đăng nhập
+     */
+    private void setupLoginButton() {
+        btnLogin.setOnClickListener(v -> {
             String username = editUsername.getText().toString().trim();
             String password = editPassword.getText().toString().trim();
 
@@ -59,83 +65,60 @@ public class LoginActivity extends AppCompatActivity {
                 return;
             }
 
-            handleLogin(username, password);
+            // Hiển thị ProgressDialog trong quá trình đăng nhập
+            ProgressDialog progressDialog = new ProgressDialog(this);
+            progressDialog.setMessage("Đang đăng nhập...");
+            progressDialog.setCancelable(false);
+            progressDialog.show();
+
+            // Thực hiện đăng nhập trong thread riêng
+            new Thread(() -> {
+                try {
+                    Account account = dbManager.checkLogin(username, password);
+                    runOnUiThread(() -> {
+                        progressDialog.dismiss();
+                        if (account != null) {
+                            // Lưu thông tin đăng nhập
+                            saveLoginInfo(account);
+                            // Chuyển đến MainActivity
+                            startActivity(new Intent(this, MainActivity.class));
+                            finish();
+                        } else {
+                            Toast.makeText(this, "Tên đăng nhập hoặc mật khẩu không đúng", Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                } catch (Exception e) {
+                    runOnUiThread(() -> {
+                        progressDialog.dismiss();
+                        Toast.makeText(this, "Lỗi đăng nhập: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    });
+                }
+            }).start();
         });
     }
 
     /**
-     * Xử lý quá trình đăng nhập
-     * Kiểm tra thông tin đăng nhập và phân quyền
-     */
-    private void handleLogin(String username, String password) {
-        showProgressDialog();
-        new Thread(() -> {
-            try {
-                Account account = databaseManager.checkLogin(username, password);
-                runOnUiThread(() -> {
-                    hideProgressDialog();
-                    if (account != null) {
-                        // Lưu thông tin đăng nhập
-                        saveLoginInfo(username, password, account.getRole(), account);
-                        startMainActivity();
-                    } else {
-                        Toast.makeText(LoginActivity.this, 
-                            "Tên đăng nhập hoặc mật khẩu không đúng", Toast.LENGTH_SHORT).show();
-                    }
-                });
-            } catch (Exception e) {
-                runOnUiThread(() -> {
-                    hideProgressDialog();
-                    Toast.makeText(LoginActivity.this, 
-                        "Lỗi đăng nhập: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                });
-            }
-        }).start();
-    }
-
-    /**
      * Lưu thông tin đăng nhập vào SharedPreferences
+     * @param account Đối tượng Account chứa thông tin người dùng
      */
-    private void saveLoginInfo(String username, String password, String role, Account account) {
-        SharedPreferences.Editor editor = getSharedPreferences("login_prefs", MODE_PRIVATE).edit();
-        editor.putString("username", username);
-        editor.putString("password", password);
-        editor.putString("user_role", role);
+    private void saveLoginInfo(Account account) {
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.putString("username", account.getUsername());
+        editor.putString("password", account.getPassword());
+        editor.putString("user_role", account.getRole());
         editor.putInt("user_id", account.getId());
         editor.apply();
-        Log.d(TAG, "Đã lưu thông tin đăng nhập: " + username + ", quyền: " + role + ", ID: " + account.getId());
+        Log.d(TAG, "Đã lưu thông tin đăng nhập cho user: " + account.getUsername() + ", ID: " + account.getId());
     }
 
     /**
-     * Chuyển đến MainActivity
+     * Xử lý khi Activity bị hủy
      */
-    private void startMainActivity() {
-        Intent intent = new Intent(this, MainActivity.class);
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        startActivity(intent);
-        finish();
-    }
-
-    /**
-     * Hiển thị dialog tiến trình
-     */
-    private void showProgressDialog() {
-        progressDialog.show();
-    }
-
-    /**
-     * Ẩn dialog tiến trình
-     */
-    private void hideProgressDialog() {
-        progressDialog.dismiss();
-    }
-
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        hideProgressDialog();
-        if (databaseManager != null) {
-            databaseManager.close();
+        if (dbManager != null) {
+            dbManager.close();
         }
     }
 } 

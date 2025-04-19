@@ -15,6 +15,18 @@
         app:showAsAction="ifRoom" />
 
     <item
+        android:id="@+id/action_history"
+        android:title="Lịch sử mua hàng"
+        android:icon="@android:drawable/ic_menu_recent_history"
+        app:showAsAction="ifRoom" />
+
+    <item
+        android:id="@+id/menu_cart"
+        android:title="Giỏ hàng"
+        android:icon="@android:drawable/ic_menu_more"
+        app:showAsAction="ifRoom" />
+
+    <item
         android:id="@+id/action_logout"
         android:icon="@drawable/ic_logout"
         android:title="Đăng xuất"

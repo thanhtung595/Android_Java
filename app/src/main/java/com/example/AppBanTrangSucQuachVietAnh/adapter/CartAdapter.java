@@ -5,30 +5,47 @@ import android.graphics.BitmapFactory;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ImageButton;
+import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.AppBanTrangSucQuachVietAnh.R;
 import com.example.AppBanTrangSucQuachVietAnh.model.CartItem;
+import com.example.AppBanTrangSucQuachVietAnh.database.DatabaseManager;
 
 import java.text.NumberFormat;
 import java.util.List;
 import java.util.Locale;
 
-public class CartAdapter extends RecyclerView.Adapter<CartAdapter.CartViewHolder> {
+/**
+ * Adapter cho RecyclerView hiển thị danh sách sản phẩm trong giỏ hàng
+ * Xử lý hiển thị thông tin sản phẩm và các sự kiện tương tác
+ */
+public class CartAdapter extends RecyclerView.Adapter<CartAdapter.ViewHolder> {
+    private static final String TAG = "CartAdapter";
     private List<CartItem> cartItems;
     private final NumberFormat currencyFormat;
-    private final CartItemListener listener;
+    private OnItemClickListener listener;
 
-    public interface CartItemListener {
-        void onQuantityChanged(CartItem item, int newQuantity);
-        void onDeleteClick(CartItem item);
+    /**
+     * Interface định nghĩa các sự kiện tương tác với item trong giỏ hàng
+     */
+    public interface OnItemClickListener {
+        void onUpdateQuantity(int position, int newQuantity);
+        void onRemoveItem(int position);
     }
 
-    public CartAdapter(List<CartItem> cartItems, CartItemListener listener) {
+    /**
+     * Constructor của CartAdapter
+     * @param cartItems Danh sách sản phẩm trong giỏ hàng
+     * @param listener Listener xử lý các sự kiện
+     */
+    public CartAdapter(List<CartItem> cartItems, OnItemClickListener listener) {
         this.cartItems = cartItems;
         this.listener = listener;
         this.currencyFormat = NumberFormat.getCurrencyInstance(new Locale("vi", "VN"));
@@ -39,69 +56,115 @@ public class CartAdapter extends RecyclerView.Adapter<CartAdapter.CartViewHolder
         notifyDataSetChanged();
     }
 
-    @NonNull
+    /**
+     * Tạo ViewHolder mới
+     * @param parent ViewGroup chứa các item
+     * @param viewType Loại view
+     * @return ViewHolder mới
+     */
     @Override
-    public CartViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_cart, parent, false);
-        return new CartViewHolder(view);
+    public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+        View view = LayoutInflater.from(parent.getContext())
+                .inflate(R.layout.item_cart, parent, false);
+        return new ViewHolder(view);
     }
 
+    /**
+     * Gắn dữ liệu vào ViewHolder
+     * @param holder ViewHolder cần gắn dữ liệu
+     * @param position Vị trí của item trong danh sách
+     */
     @Override
-    public void onBindViewHolder(@NonNull CartViewHolder holder, int position) {
+    public void onBindViewHolder(ViewHolder holder, int position) {
         CartItem item = cartItems.get(position);
-
-        holder.textName.setText(item.getProductName());
-        holder.textPrice.setText(currencyFormat.format(item.getProductPrice()));
-        holder.textQuantity.setText(String.valueOf(item.getQuantity()));
-
-        // Load image
-        if (item.getProductImage() != null && item.getProductImage().length > 0) {
-            Bitmap bitmap = BitmapFactory.decodeByteArray(item.getProductImage(), 0, item.getProductImage().length);
-            holder.imageView.setImageBitmap(bitmap);
-        } else {
-            holder.imageView.setImageResource(R.drawable.ic_jewelry);
-        }
-
-        // Handle quantity changes
-        holder.buttonDecrease.setOnClickListener(v -> {
-            int newQuantity = item.getQuantity() - 1;
-            if (newQuantity >= 1) {
-                listener.onQuantityChanged(item, newQuantity);
-            }
-        });
-
-        holder.buttonIncrease.setOnClickListener(v -> {
-            int newQuantity = item.getQuantity() + 1;
-            listener.onQuantityChanged(item, newQuantity);
-        });
-
-        // Handle delete
-        holder.buttonDelete.setOnClickListener(v -> listener.onDeleteClick(item));
+        holder.bind(item, position, listener);
     }
 
+    /**
+     * Lấy số lượng item trong danh sách
+     * @return Số lượng item
+     */
     @Override
     public int getItemCount() {
         return cartItems.size();
     }
 
-    public static class CartViewHolder extends RecyclerView.ViewHolder {
-        public ImageView imageView;
-        public TextView textName;
-        public TextView textPrice;
-        public TextView textQuantity;
-        public ImageButton buttonDecrease;
-        public ImageButton buttonIncrease;
-        public ImageButton buttonDelete;
+    /**
+     * ViewHolder cho item trong giỏ hàng
+     * Chứa các view hiển thị thông tin sản phẩm và các nút điều khiển
+     */
+    public static class ViewHolder extends RecyclerView.ViewHolder {
+        private ImageView imageView;
+        private TextView nameTextView;
+        private TextView priceTextView;
+        private TextView quantityTextView;
+        private Button btnRemove;
+        private Button btnUpdate;
 
-        public CartViewHolder(@NonNull View itemView) {
+        /**
+         * Constructor của ViewHolder
+         * @param itemView View của item
+         */
+        public ViewHolder(View itemView) {
             super(itemView);
             imageView = itemView.findViewById(R.id.imageView);
-            textName = itemView.findViewById(R.id.textName);
-            textPrice = itemView.findViewById(R.id.textPrice);
-            textQuantity = itemView.findViewById(R.id.textQuantity);
-            buttonDecrease = itemView.findViewById(R.id.buttonDecrease);
-            buttonIncrease = itemView.findViewById(R.id.buttonIncrease);
-            buttonDelete = itemView.findViewById(R.id.buttonDelete);
+            nameTextView = itemView.findViewById(R.id.nameTextView);
+            priceTextView = itemView.findViewById(R.id.priceTextView);
+            quantityTextView = itemView.findViewById(R.id.quantityTextView);
+            btnRemove = itemView.findViewById(R.id.btnRemove);
+            btnUpdate = itemView.findViewById(R.id.btnUpdate);
+        }
+
+        /**
+         * Gắn dữ liệu sản phẩm vào các view
+         * @param item Sản phẩm trong giỏ hàng
+         * @param position Vị trí của item trong danh sách
+         * @param listener Listener xử lý các sự kiện
+         */
+        public void bind(CartItem item, int position, OnItemClickListener listener) {
+            // Hiển thị hình ảnh sản phẩm
+            if (item.getProductImage() != null) {
+                imageView.setImageBitmap(DatabaseManager.byteArrayToBitmap(item.getProductImage()));
+            } else {
+                imageView.setImageResource(R.drawable.placeholder);
+            }
+
+            // Hiển thị thông tin sản phẩm
+            nameTextView.setText(item.getProductName());
+            priceTextView.setText(currencyFormat.format(item.getProductPrice()));
+            quantityTextView.setText(String.valueOf(item.getQuantity()));
+
+            // Xử lý sự kiện nút xóa
+            btnRemove.setOnClickListener(v -> {
+                if (listener != null) {
+                    listener.onRemoveItem(position);
+                }
+            });
+
+            // Xử lý sự kiện nút cập nhật số lượng
+            btnUpdate.setOnClickListener(v -> {
+                EditText editQuantity = new EditText(itemView.getContext());
+                editQuantity.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+                editQuantity.setText(String.valueOf(item.getQuantity()));
+
+                AlertDialog.Builder builder = new AlertDialog.Builder(itemView.getContext());
+                builder.setTitle("Cập nhật số lượng");
+                builder.setView(editQuantity);
+                builder.setPositiveButton("Cập nhật", (dialog, which) -> {
+                    String quantityStr = editQuantity.getText().toString();
+                    if (!quantityStr.isEmpty()) {
+                        int newQuantity = Integer.parseInt(quantityStr);
+                        if (newQuantity > 0) {
+                            listener.onUpdateQuantity(position, newQuantity);
+                        } else {
+                            Toast.makeText(itemView.getContext(), 
+                                "Số lượng phải lớn hơn 0", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                });
+                builder.setNegativeButton("Hủy", null);
+                builder.show();
+            });
         }
     }
 } 

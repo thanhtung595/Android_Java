@@ -350,34 +350,52 @@ public class DatabaseManager {
      * @return List<Jewelry> danh sách sản phẩm tìm thấy
      */
     public List<Jewelry> searchJewelry(String keyword) {
-        List<Jewelry> jewelryList = new ArrayList<>();
-        String sql = "SELECT * FROM products WHERE name LIKE ? OR category LIKE ? ORDER BY created_at DESC";
-        
-        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-            String searchPattern = "%" + keyword + "%";
-            stmt.setString(1, searchPattern);
-            stmt.setString(2, searchPattern);
-            
-            try (ResultSet rs = stmt.executeQuery()) {
-                while (rs.next()) {
-                    Jewelry jewelry = new Jewelry();
-                    jewelry.setId(rs.getInt("id"));
-                    jewelry.setName(rs.getString("name"));
-                    jewelry.setDescription(rs.getString("description"));
-                    jewelry.setPrice(rs.getDouble("price"));
-                    jewelry.setStock(rs.getInt("stock"));
-                    jewelry.setCategory(rs.getString("category"));
-                    jewelry.setImage(rs.getBytes("image"));
-                    jewelry.setCreatedBy(rs.getInt("created_by"));
-                    jewelry.setCreatedAt(rs.getTimestamp("created_at"));
-                    jewelry.setUpdatedAt(rs.getTimestamp("updated_at"));
-                    jewelryList.add(jewelry);
+        List<Jewelry> result = new ArrayList<>();
+        try {
+            // Kiểm tra và tạo kết nối mới nếu cần
+            if (connection == null || connection.isClosed()) {
+                Log.e(TAG, "Kết nối đã đóng, tạo kết nối mới");
+                connection = MySQLConnection.getConnection();
+                if (connection == null) {
+                    Log.e(TAG, "Không thể tạo kết nối mới");
+                    return result;
                 }
             }
+
+            String query = "SELECT * FROM products WHERE name LIKE ?";
+            PreparedStatement statement = connection.prepareStatement(query);
+            statement.setString(1, "%" + keyword + "%");
+            
+            ResultSet resultSet = statement.executeQuery();
+            while (resultSet.next()) {
+                Jewelry jewelry = new Jewelry();
+                jewelry.setId(resultSet.getInt("id"));
+                jewelry.setName(resultSet.getString("name"));
+                jewelry.setDescription(resultSet.getString("description"));
+                jewelry.setPrice(resultSet.getDouble("price"));
+                jewelry.setStock(resultSet.getInt("stock"));
+                jewelry.setCategory(resultSet.getString("category"));
+                jewelry.setImage(resultSet.getBytes("image"));
+                jewelry.setCreatedBy(resultSet.getInt("created_by"));
+                jewelry.setCreatedAt(resultSet.getTimestamp("created_at"));
+                jewelry.setUpdatedAt(resultSet.getTimestamp("updated_at"));
+                result.add(jewelry);
+            }
+            
+            resultSet.close();
+            statement.close();
         } catch (SQLException e) {
-            Log.e(TAG, "Lỗi tìm kiếm sản phẩm: " + e.getMessage(), e);
+            Log.e(TAG, "Lỗi tìm kiếm sản phẩm: " + e.getMessage());
+            e.printStackTrace();
+            // Thử kết nối lại nếu lỗi là do mất kết nối
+            if (e.getMessage().contains("connection closed") || 
+                e.getMessage().contains("Connection refused") ||
+                e.getMessage().contains("Communications link failure")) {
+                Log.d(TAG, "Lỗi kết nối, đang thử kết nối lại...");
+                tryReconnect();
+            }
         }
-        return jewelryList;
+        return result;
     }
 
     /**
@@ -414,6 +432,11 @@ public class DatabaseManager {
         return jewelryList;
     }
 
+    /**
+     * Lấy kết nối đến database
+     * @return Connection kết nối đến database
+     * @throws SQLException nếu không thể tạo kết nối
+     */
     private synchronized Connection getConnection() throws SQLException {
         Log.d(TAG, "Getting database connection...");
         try {
@@ -446,6 +469,12 @@ public class DatabaseManager {
         }
     }
 
+    /**
+     * Kiểm tra sự tồn tại của bảng trong database
+     * @param metaData Thông tin metadata của database
+     * @param tableName Tên bảng cần kiểm tra
+     * @throws SQLException nếu có lỗi khi kiểm tra
+     */
     private void checkTable(DatabaseMetaData metaData, String tableName) throws SQLException {
         try (ResultSet tables = metaData.getTables(null, null, tableName, null)) {
             if (!tables.next()) {
@@ -462,6 +491,11 @@ public class DatabaseManager {
         }
     }
 
+    /**
+     * Lấy thông tin sản phẩm theo ID
+     * @param id ID của sản phẩm
+     * @return Jewelry đối tượng sản phẩm, null nếu không tìm thấy
+     */
     public Jewelry getJewelryById(int id) {
         try {
             Connection conn = getConnection();
@@ -512,7 +546,11 @@ public class DatabaseManager {
         }
     }
 
-    // Utility methods
+    /**
+     * Chuyển đổi Bitmap thành mảng byte
+     * @param bitmap Bitmap cần chuyển đổi
+     * @return byte[] mảng byte của bitmap
+     */
     public static byte[] bitmapToByteArray(Bitmap bitmap) {
         if (bitmap == null) {
             Log.e(TAG, "Bitmap is null");
@@ -534,6 +572,11 @@ public class DatabaseManager {
         }
     }
 
+    /**
+     * Chuyển đổi mảng byte thành Bitmap
+     * @param data Mảng byte cần chuyển đổi
+     * @return Bitmap đã chuyển đổi
+     */
     public static Bitmap byteArrayToBitmap(byte[] data) {
         if (data == null) {
             Log.e(TAG, "Byte array is null");
@@ -553,6 +596,11 @@ public class DatabaseManager {
         }
     }
 
+    /**
+     * Đóng các tài nguyên PreparedStatement và ResultSet
+     * @param pstmt PreparedStatement cần đóng
+     * @param rs ResultSet cần đóng
+     */
     private void closeResources(PreparedStatement pstmt, ResultSet rs) {
         try {
             if (rs != null) {
@@ -568,6 +616,8 @@ public class DatabaseManager {
 
     /**
      * Thêm sản phẩm vào giỏ hàng
+     * @param cartItem Đối tượng CartItem cần thêm
+     * @return true nếu thêm thành công
      */
     public boolean addToCart(CartItem cartItem) {
         try {
@@ -592,6 +642,8 @@ public class DatabaseManager {
 
     /**
      * Lấy danh sách sản phẩm trong giỏ hàng của user
+     * @param userId ID của user
+     * @return List<CartItem> danh sách sản phẩm trong giỏ hàng
      */
     public List<CartItem> getCartItems(int userId) {
         List<CartItem> cartItems = new ArrayList<>();
@@ -630,6 +682,9 @@ public class DatabaseManager {
 
     /**
      * Cập nhật số lượng sản phẩm trong giỏ hàng
+     * @param cartId ID của mục trong giỏ hàng
+     * @param quantity Số lượng mới
+     * @return true nếu cập nhật thành công
      */
     public boolean updateCartItemQuantity(int cartId, int quantity) {
         try {
@@ -653,6 +708,8 @@ public class DatabaseManager {
 
     /**
      * Xóa sản phẩm khỏi giỏ hàng
+     * @param cartId ID của mục trong giỏ hàng
+     * @return true nếu xóa thành công
      */
     public boolean removeFromCart(int cartId) {
         try {
@@ -675,6 +732,9 @@ public class DatabaseManager {
 
     /**
      * Tạo đơn hàng mới từ giỏ hàng
+     * @param userId ID của user
+     * @param cartItems Danh sách sản phẩm trong giỏ hàng
+     * @return true nếu tạo đơn hàng thành công
      */
     public boolean createOrder(int userId, List<CartItem> cartItems) {
         String orderSql = "INSERT INTO orders (user_id, total_amount) VALUES (?, ?)";
@@ -742,6 +802,8 @@ public class DatabaseManager {
 
     /**
      * Lấy danh sách đơn hàng của user
+     * @param userId ID của user
+     * @return List<Order> danh sách đơn hàng
      */
     public List<Order> getUserOrders(int userId) {
         List<Order> orders = new ArrayList<>();
@@ -773,6 +835,8 @@ public class DatabaseManager {
 
     /**
      * Lấy chi tiết của một đơn hàng
+     * @param orderId ID của đơn hàng
+     * @return List<OrderDetail> danh sách chi tiết đơn hàng
      */
     private List<OrderDetail> getOrderDetails(int orderId) {
         List<OrderDetail> details = new ArrayList<>();

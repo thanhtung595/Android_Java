@@ -20,6 +20,8 @@ import androidx.appcompat.widget.SearchView;
 import android.widget.ImageButton;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.text.InputType;
 
 import com.example.AppBanTrangSucQuachVietAnh.adapter.JewelryAdapter;
 import com.example.AppBanTrangSucQuachVietAnh.data.DatabaseManager;
@@ -29,17 +31,17 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import java.util.List;
 import java.util.Locale;
 import java.text.NumberFormat;
+import java.util.ArrayList;
 
 /**
- * Activity chính của ứng dụng hiển thị danh sách sản phẩm trang sức.
- * Xử lý hiển thị sản phẩm, tìm kiếm, lọc và các chức năng dành cho admin.
+ * Activity chính của ứng dụng, hiển thị danh sách sản phẩm và các chức năng chính
  */
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
     private RecyclerView recyclerView;
     private JewelryAdapter adapter;
     private List<Jewelry> jewelryList;
-    private DatabaseManager databaseManager;
+    private DatabaseManager dbManager;
     private TextView textEmpty;
     private SharedPreferences preferences;
     private int userId;
@@ -48,7 +50,13 @@ public class MainActivity extends AppCompatActivity {
     private ProgressDialog progressDialog;
     private View progressBar;
     private View emptyView;
+    private SearchView searchView;
+    private MenuItem searchMenuItem;
 
+    /**
+     * Khởi tạo Activity và các thành phần giao diện
+     * @param savedInstanceState Trạng thái đã lưu của Activity
+     */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -64,146 +72,82 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         Log.d(TAG, "onCreate started");
 
-        // Khởi tạo đối tượng quản lý cơ sở dữ liệu
-        databaseManager = DatabaseManager.getInstance();
+        // Khởi tạo các thành phần
+        initializeComponents();
+        
+        // Lấy thông tin user từ SharedPreferences
+        loadUserInfo();
+        
+        // Khởi tạo RecyclerView và Adapter
+        setupRecyclerView();
+        
+        // Tải danh sách sản phẩm
+        loadJewelryList();
+    }
 
-        // Lấy thông tin đăng nhập từ SharedPreferences
+    /**
+     * Khởi tạo các thành phần giao diện và đối tượng cần thiết
+     */
+    private void initializeComponents() {
+        recyclerView = findViewById(R.id.recyclerView);
+        dbManager = DatabaseManager.getInstance();
+        jewelryList = new ArrayList<>();
+        textEmpty = findViewById(R.id.textEmpty);
+        progressBar = findViewById(R.id.progressBar);
+        emptyView = findViewById(R.id.emptyView);
+    }
+
+    /**
+     * Lấy thông tin user từ SharedPreferences
+     */
+    private void loadUserInfo() {
         SharedPreferences prefs = getSharedPreferences("login_prefs", MODE_PRIVATE);
-        String username = prefs.getString("username", "");
-        String password = prefs.getString("password", "");
-        String userRole = prefs.getString("user_role", "");
         userId = prefs.getInt("user_id", -1);
-
-        if (username.isEmpty() || password.isEmpty()) {
-            Log.d(TAG, "Chưa đăng nhập, chuyển đến LoginActivity");
-            startActivity(new Intent(this, LoginActivity.class));
+        if (userId == -1) {
+            Log.e(TAG, "Không tìm thấy user_id trong SharedPreferences");
             finish();
-            return;
         }
-
-        // Kiểm tra quyền admin
-        boolean isAdmin = "admin".equals(userRole);
+        userRole = prefs.getString("user_role", "");
+        isAdmin = "admin".equals(userRole);
         Log.d(TAG, "Quyền người dùng: " + userRole + ", là admin: " + isAdmin);
-
-        // Đã đăng nhập, tiếp tục khởi tạo MainActivity
-        initToolbar();
-        initRecyclerView(isAdmin);
-        initFAB(isAdmin);
-        initEmptyView();
-
-        // Tải danh sách sản phẩm trong thread riêng
-        loadJewelryData();
     }
 
     /**
-     * Khởi tạo thanh công cụ với các tùy chọn tìm kiếm và lọc
+     * Thiết lập RecyclerView và Adapter
      */
-    private void initToolbar() {
-        try {
-            Toolbar toolbar = findViewById(R.id.toolbar);
-            setSupportActionBar(toolbar);
-            Log.d(TAG, "Đã khởi tạo thanh công cụ");
-        } catch (Exception e) {
-            Log.e(TAG, "Lỗi khởi tạo thanh công cụ: " + e.getMessage(), e);
-        }
-    }
-
-    /**
-     * Khởi tạo RecyclerView để hiển thị danh sách sản phẩm
-     * @param isAdmin boolean để kiểm soát các tính năng dành cho admin
-     */
-    private void initRecyclerView(boolean isAdmin) {
-        try {
-            Log.d(TAG, "Khởi tạo RecyclerView");
-            recyclerView = findViewById(R.id.recyclerView);
-            
-            // Thiết lập LayoutManager với 3 cột
-            GridLayoutManager layoutManager = new GridLayoutManager(this, 3);
-            recyclerView.setLayoutManager(layoutManager);
-            
-            // Khởi tạo adapter với xử lý click
-            adapter = new JewelryAdapter(
-                this, 
-                isAdmin,
-                // Xử lý sự kiện xóa
-                jewelry -> {
-                    new AlertDialog.Builder(this)
-                        .setTitle("Xác nhận xóa")
-                        .setMessage("Bạn có chắc chắn muốn xóa sản phẩm này?")
-                        .setPositiveButton("Xóa", (dialog, which) -> deleteJewelry(jewelry))
-                        .setNegativeButton("Hủy", null)
-                        .show();
-                },
-                // Xử lý sự kiện click vào item
-                jewelry -> {
-                    Log.d(TAG, "Click vào sản phẩm: " + jewelry.getId());
-                    if (isAdmin) {
-                        Intent intent = new Intent(this, EditJewelryActivity.class);
-                        intent.putExtra("jewelry", jewelry);
-                        startActivity(intent);
-                    } else {
-                        showAddToCartDialog(jewelry);
-                    }
-                }
-            );
-            
-            // Thiết lập adapter cho RecyclerView
-            recyclerView.setAdapter(adapter);
-            Log.d(TAG, "Đã khởi tạo RecyclerView và Adapter");
-            
-        } catch (Exception e) {
-            Log.e(TAG, "Lỗi khởi tạo RecyclerView: " + e.getMessage(), e);
-        }
-    }
-
-    /**
-     * Khởi tạo nút thêm mới (FAB)
-     * Chỉ hiển thị với người dùng admin
-     * @param isAdmin boolean để kiểm soát hiển thị FAB
-     */
-    private void initFAB(boolean isAdmin) {
-        try {
-            Log.d(TAG, "Đang khởi tạo FAB, là admin: " + isAdmin);
-            FloatingActionButton fab = findViewById(R.id.fabAdd);
-            
-            // Chỉ hiển thị FAB nếu là admin
-            if (isAdmin) {
-                fab.setVisibility(View.VISIBLE);
-                fab.setOnClickListener(v -> {
-                    Log.d(TAG, "Đã nhấn FAB");
-                    Intent intent = new Intent(MainActivity.this, AddJewelryActivity.class);
+    private void setupRecyclerView() {
+        recyclerView.setLayoutManager(new GridLayoutManager(this, 3));
+        adapter = new JewelryAdapter(
+            this, 
+            isAdmin,
+            // Xử lý sự kiện xóa
+            jewelry -> {
+                new AlertDialog.Builder(this)
+                    .setTitle("Xác nhận xóa")
+                    .setMessage("Bạn có chắc chắn muốn xóa sản phẩm này?")
+                    .setPositiveButton("Xóa", (dialog, which) -> deleteJewelry(jewelry))
+                    .setNegativeButton("Hủy", null)
+                    .show();
+            },
+            // Xử lý sự kiện click vào item
+            jewelry -> {
+                Log.d(TAG, "Click vào sản phẩm: " + jewelry.getId());
+                if (isAdmin) {
+                    Intent intent = new Intent(this, EditJewelryActivity.class);
+                    intent.putExtra("jewelry", jewelry);
                     startActivity(intent);
-                });
-                Log.d(TAG, "Đã khởi tạo và hiển thị FAB cho admin");
-            } else {
-                fab.setVisibility(View.GONE);
-                Log.d(TAG, "Đã ẩn FAB cho người dùng không phải admin");
+                } else {
+                    showAddToCartDialog(jewelry);
+                }
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Lỗi khởi tạo FAB: " + e.getMessage());
-            e.printStackTrace();
-        }
+        );
+        recyclerView.setAdapter(adapter);
     }
 
     /**
-     * Khởi tạo view hiển thị khi không có sản phẩm
+     * Tải danh sách sản phẩm từ database
      */
-    private void initEmptyView() {
-        try {
-            textEmpty = findViewById(R.id.textEmpty);
-            progressBar = findViewById(R.id.progressBar);
-            emptyView = findViewById(R.id.emptyView);
-            Log.d(TAG, "Đã khởi tạo view trống");
-        } catch (Exception e) {
-            Log.e(TAG, "Lỗi khởi tạo view trống: " + e.getMessage(), e);
-        }
-    }
-
-    /**
-     * Tải danh sách sản phẩm từ cơ sở dữ liệu
-     * Cập nhật giao diện với danh sách sản phẩm hoặc thông báo trống
-     */
-    private void loadJewelryData() {
+    private void loadJewelryList() {
         Log.d(TAG, "Bắt đầu tải danh sách sản phẩm");
         
         // Hiển thị loading trên main thread
@@ -212,7 +156,7 @@ public class MainActivity extends AppCompatActivity {
         new Thread(() -> {
             try {
                 // Kiểm tra kết nối database
-                if (databaseManager == null) {
+                if (dbManager == null) {
                     Log.e(TAG, "DatabaseManager chưa được khởi tạo");
                     runOnUiThread(() -> {
                         hideLoading();
@@ -222,7 +166,7 @@ public class MainActivity extends AppCompatActivity {
                 }
 
                 // Kiểm tra kết nối
-                if (!databaseManager.checkConnection()) {
+                if (!dbManager.checkConnection()) {
                     Log.e(TAG, "Không thể kết nối đến cơ sở dữ liệu");
                     runOnUiThread(() -> {
                         hideLoading();
@@ -232,7 +176,7 @@ public class MainActivity extends AppCompatActivity {
                 }
 
                 Log.d(TAG, "Đang lấy danh sách sản phẩm từ database");
-                List<Jewelry> jewelryList = databaseManager.getAllJewelry();
+                List<Jewelry> jewelryList = dbManager.getAllJewelry();
                 Log.d(TAG, "Số lượng sản phẩm lấy được: " + (jewelryList != null ? jewelryList.size() : 0));
 
                 // Cập nhật UI trên main thread
@@ -244,7 +188,9 @@ public class MainActivity extends AppCompatActivity {
                     } else {
                         Log.d(TAG, "Hiển thị " + jewelryList.size() + " sản phẩm");
                         hideEmptyView();
-                        adapter.setJewelryList(jewelryList);
+                        this.jewelryList.clear();
+                        this.jewelryList.addAll(jewelryList);
+                        adapter.setJewelryList(this.jewelryList);
                     }
                 });
             } catch (Exception e) {
@@ -296,7 +242,7 @@ public class MainActivity extends AppCompatActivity {
         super.onResume();
         Log.d(TAG, "onResume bắt đầu");
         // Tải lại dữ liệu khi activity được khôi phục
-        new Thread(this::loadJewelryData).start();
+        new Thread(this::loadJewelryList).start();
     }
 
     /**
@@ -304,11 +250,12 @@ public class MainActivity extends AppCompatActivity {
      */
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        if (item.getItemId() == R.id.action_logout) {
+        int id = item.getItemId();
+        
+        if (id == R.id.action_logout) {
             // Xóa thông tin đăng nhập
-            SharedPreferences.Editor editor = getSharedPreferences("user_prefs", MODE_PRIVATE).edit();
-            editor.remove("username");
-            editor.remove("user_role");
+            SharedPreferences.Editor editor = getSharedPreferences("login_prefs", MODE_PRIVATE).edit();
+            editor.clear();
             editor.apply();
             
             // Chuyển về màn hình đăng nhập
@@ -317,13 +264,21 @@ public class MainActivity extends AppCompatActivity {
             startActivity(intent);
             finish();
             return true;
-        }
-        if (item.getItemId() == R.id.menu_cart) {
-            Intent intent = new Intent(this, CartActivity.class);
-            intent.putExtra("user_id", userId);
+        } else if (id == R.id.action_history) {
+            // Chuyển đến màn hình lịch sử mua hàng
+            Intent intent = new Intent(this, OrderHistoryActivity.class);
             startActivity(intent);
             return true;
+        } else if (id == R.id.menu_cart) {
+            // Chuyển đến màn hình giỏ hàng
+            Intent intent = new Intent(this, CartActivity.class);
+            startActivity(intent);
+            return true;
+        } else if (id == R.id.action_search) {
+            showSearchDialog();
+            return true;
         }
+        
         return super.onOptionsItemSelected(item);
     }
 
@@ -334,37 +289,105 @@ public class MainActivity extends AppCompatActivity {
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.menu_main, menu);
         
-        // Thêm menu giỏ hàng cho user
-        if (!isAdmin) {
-            menu.add(Menu.NONE, R.id.menu_cart, Menu.NONE, "Giỏ hàng")
-                .setIcon(android.R.drawable.ic_menu_more)
-                .setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
+        // Thiết lập SearchView
+        searchMenuItem = menu.findItem(R.id.action_search);
+        searchView = (SearchView) searchMenuItem.getActionView();
+        setupSearchView();
+        
+        return true;
+    }
+
+    /**
+     * Thiết lập SearchView cho chức năng tìm kiếm
+     */
+    private void setupSearchView() {
+        searchView.setQueryHint("Nhập tên sản phẩm...");
+        searchView.setIconifiedByDefault(false);
+        searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+            @Override
+            public boolean onQueryTextSubmit(String query) {
+                searchJewelry(query);
+                return true;
+            }
+
+            @Override
+            public boolean onQueryTextChange(String newText) {
+                if (newText.isEmpty()) {
+                    loadJewelryList();
+                }
+                return true;
+            }
+        });
+    }
+
+    /**
+     * Tìm kiếm sản phẩm theo từ khóa
+     * @param keyword Từ khóa tìm kiếm
+     */
+    private void searchJewelry(String keyword) {
+        if (keyword.trim().isEmpty()) {
+            loadJewelryList();
+            return;
         }
 
-        // Thiết lập SearchView
-        MenuItem searchItem = menu.findItem(R.id.action_search);
-        if (searchItem != null) {
-            SearchView searchView = (SearchView) searchItem.getActionView();
-            if (searchView != null) {
-                searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
-                    @Override
-                    public boolean onQueryTextSubmit(String query) {
-                        searchJewelry(query);
-                        return true;
-                    }
-
-                    @Override
-                    public boolean onQueryTextChange(String newText) {
-                        if (newText.isEmpty()) {
-                            loadJewelryData();
-                        }
-                        return true;
+        new Thread(() -> {
+            try {
+                List<Jewelry> searchResults = dbManager.searchJewelry(keyword);
+                runOnUiThread(() -> {
+                    if (searchResults != null && !searchResults.isEmpty()) {
+                        jewelryList.clear();
+                        jewelryList.addAll(searchResults);
+                        adapter.setJewelryList(jewelryList);
+                        textEmpty.setVisibility(View.GONE);
+                        recyclerView.setVisibility(View.VISIBLE);
+                    } else {
+                        jewelryList.clear();
+                        textEmpty.setText("Không tìm thấy sản phẩm phù hợp");
+                        textEmpty.setVisibility(View.VISIBLE);
+                        recyclerView.setVisibility(View.GONE);
                     }
                 });
+            } catch (Exception e) {
+                Log.e(TAG, "Lỗi tìm kiếm: " + e.getMessage());
+                runOnUiThread(() -> {
+                    Toast.makeText(this, "Lỗi tìm kiếm: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    loadJewelryList();
+                });
             }
-        }
+        }).start();
+    }
 
-        return true;
+    private void showSearchDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Tìm kiếm sản phẩm");
+
+        // Tạo layout cho dialog
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(40, 20, 40, 20);
+
+        // Tạo EditText để nhập tên sản phẩm
+        EditText editSearch = new EditText(this);
+        editSearch.setHint("Nhập tên sản phẩm");
+        editSearch.setInputType(InputType.TYPE_CLASS_TEXT);
+        layout.addView(editSearch);
+
+        builder.setView(layout);
+
+        // Thêm nút tìm kiếm
+        builder.setPositiveButton("Tìm kiếm", (dialog, which) -> {
+            String keyword = editSearch.getText().toString().trim();
+            if (!keyword.isEmpty()) {
+                searchJewelry(keyword);
+            } else {
+                Toast.makeText(this, "Vui lòng nhập tên sản phẩm", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        // Thêm nút hủy
+        builder.setNegativeButton("Hủy", (dialog, which) -> dialog.dismiss());
+
+        builder.show();
     }
 
     /**
@@ -374,15 +397,15 @@ public class MainActivity extends AppCompatActivity {
         Log.d(TAG, "Bắt đầu xóa sản phẩm: " + jewelry.getId());
         new Thread(() -> {
             try {
-                if (databaseManager.deleteJewelry(jewelry.getId())) {
+                if (dbManager.deleteJewelry(jewelry.getId())) {
                     runOnUiThread(() -> {
                         Toast.makeText(this, "Xóa sản phẩm thành công", Toast.LENGTH_SHORT).show();
                         // Đóng kết nối hiện tại
-                        databaseManager.close();
+                        dbManager.close();
                         // Tạo kết nối mới
-                        databaseManager = DatabaseManager.getInstance();
+                        dbManager = DatabaseManager.getInstance();
                         // Tải lại dữ liệu
-                        loadJewelryData();
+                        loadJewelryList();
                     });
                 } else {
                     runOnUiThread(() -> {
@@ -398,6 +421,10 @@ public class MainActivity extends AppCompatActivity {
         }).start();
     }
 
+    /**
+     * Hiển thị dialog thêm sản phẩm vào giỏ hàng
+     * @param jewelry Sản phẩm cần thêm vào giỏ hàng
+     */
     private void showAddToCartDialog(Jewelry jewelry) {
         View dialogView = getLayoutInflater().inflate(R.layout.dialog_add_to_cart, null);
         AlertDialog dialog = new AlertDialog.Builder(this)
@@ -443,7 +470,7 @@ public class MainActivity extends AppCompatActivity {
 
             CartItem cartItem = new CartItem(userId, jewelry.getId(), quantity);
             new Thread(() -> {
-                boolean success = databaseManager.addToCart(cartItem);
+                boolean success = dbManager.addToCart(cartItem);
                 runOnUiThread(() -> {
                     if (success) {
                         Toast.makeText(this, "Đã thêm vào giỏ hàng", Toast.LENGTH_SHORT).show();
@@ -458,25 +485,11 @@ public class MainActivity extends AppCompatActivity {
         dialog.show();
     }
 
-    private void searchJewelry(String keyword) {
-        new Thread(() -> {
-            List<Jewelry> results = databaseManager.searchJewelry(keyword);
-            runOnUiThread(() -> {
-                if (results.isEmpty()) {
-                    showEmptyView();
-                } else {
-                    hideEmptyView();
-                    adapter.updateData(results);
-                }
-            });
-        }).start();
-    }
-
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (databaseManager != null) {
-            databaseManager.close();
+        if (dbManager != null) {
+            dbManager.close();
         }
     }
 }

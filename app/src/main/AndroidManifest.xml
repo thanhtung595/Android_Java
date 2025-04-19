@@ -40,6 +40,10 @@
         <activity
             android:name="com.example.AppBanTrangSucQuachVietAnh.CartActivity"
             android:exported="false" />
+
+        <activity
+            android:name="com.example.AppBanTrangSucQuachVietAnh.OrderHistoryActivity"
+            android:exported="false" />
     </application>
 
 </manifest>

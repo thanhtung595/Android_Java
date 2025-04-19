@@ -4,19 +4,26 @@ import java.io.Serializable;
 import java.sql.Timestamp;
 import java.util.List;
 
+/**
+ * Model lưu trữ thông tin đơn hàng
+ * Bao gồm thông tin cơ bản và chi tiết các sản phẩm trong đơn hàng
+ */
 public class Order implements Serializable {
-    private int id;
-    private int userId;
-    private double totalAmount;
-    private String status;
-    private Timestamp createdAt;
-    private Timestamp updatedAt;
-    private List<OrderDetail> orderDetails;
+    private int id;                 // ID đơn hàng
+    private int userId;             // ID người dùng đặt hàng
+    private double totalAmount;     // Tổng tiền đơn hàng
+    private String status;          // Trạng thái đơn hàng
+    private Timestamp createdAt;    // Ngày tạo đơn hàng
+    private Timestamp updatedAt;    // Ngày cập nhật gần nhất
+    private List<OrderDetail> orderDetails; // Chi tiết các sản phẩm trong đơn hàng
 
+    /**
+     * Constructor mặc định
+     */
     public Order() {
     }
 
-    // Getters and Setters
+    // Các getter và setter
     public int getId() {
         return id;
     }
