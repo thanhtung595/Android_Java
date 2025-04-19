@@ -9,6 +9,11 @@ import java.util.List;
  * Bao gồm thông tin cơ bản và chi tiết các sản phẩm trong đơn hàng
  */
 public class Order implements Serializable {
+    // Các hằng số trạng thái đơn hàng
+    public static final String STATUS_PENDING = "pending";
+    public static final String STATUS_COMPLETED = "completed";
+    public static final String STATUS_CANCELLED = "cancelled";
+
     private int id;                 // ID đơn hàng
     private int userId;             // ID người dùng đặt hàng
     private double totalAmount;     // Tổng tiền đơn hàng

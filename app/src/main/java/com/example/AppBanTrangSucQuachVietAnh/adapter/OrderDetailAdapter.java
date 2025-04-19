@@ -1,3 +1,23 @@
+package com.example.AppBanTrangSucQuachVietAnh.adapter;
+
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.ImageView;
+import android.widget.TextView;
+
+import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.RecyclerView;
+
+import com.example.AppBanTrangSucQuachVietAnh.R;
+import com.example.AppBanTrangSucQuachVietAnh.model.OrderDetail;
+
+import java.text.NumberFormat;
+import java.util.List;
+import java.util.Locale;
+
 /**
  * Adapter cho RecyclerView hiển thị chi tiết đơn hàng
  * Xử lý hiển thị thông tin sản phẩm trong đơn hàng
@@ -60,6 +80,7 @@ public class OrderDetailAdapter extends RecyclerView.Adapter<OrderDetailAdapter.
         private TextView priceTextView;
         private TextView totalTextView;
         private ImageView productImageView;
+        private NumberFormat currencyFormat;
 
         /**
          * Constructor của ViewHolder
@@ -67,11 +88,12 @@ public class OrderDetailAdapter extends RecyclerView.Adapter<OrderDetailAdapter.
          */
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
-            productNameTextView = itemView.findViewById(R.id.productNameTextView);
-            quantityTextView = itemView.findViewById(R.id.quantityTextView);
-            priceTextView = itemView.findViewById(R.id.priceTextView);
-            totalTextView = itemView.findViewById(R.id.totalTextView);
-            productImageView = itemView.findViewById(R.id.productImageView);
+            productNameTextView = itemView.findViewById(R.id.textProductName);
+            quantityTextView = itemView.findViewById(R.id.textQuantity);
+            priceTextView = itemView.findViewById(R.id.textPrice);
+            totalTextView = itemView.findViewById(R.id.textSubtotal);
+            productImageView = itemView.findViewById(R.id.imageView);
+            currencyFormat = NumberFormat.getCurrencyInstance(new Locale("vi", "VN"));
         }
 
         /**
@@ -83,11 +105,9 @@ public class OrderDetailAdapter extends RecyclerView.Adapter<OrderDetailAdapter.
             productNameTextView.setText(orderDetail.getProductName());
             quantityTextView.setText(String.format("Số lượng: %d", orderDetail.getQuantity()));
             priceTextView.setText(String.format("Đơn giá: %s", 
-                NumberFormat.getCurrencyInstance(new Locale("vi", "VN"))
-                    .format(orderDetail.getPrice())));
+                currencyFormat.format(orderDetail.getPrice())));
             totalTextView.setText(String.format("Thành tiền: %s", 
-                NumberFormat.getCurrencyInstance(new Locale("vi", "VN"))
-                    .format(orderDetail.getPrice() * orderDetail.getQuantity())));
+                currencyFormat.format(orderDetail.getPrice() * orderDetail.getQuantity())));
 
             // Hiển thị hình ảnh sản phẩm
             if (orderDetail.getProductImage() != null) {
@@ -95,7 +115,7 @@ public class OrderDetailAdapter extends RecyclerView.Adapter<OrderDetailAdapter.
                     orderDetail.getProductImage(), 0, orderDetail.getProductImage().length);
                 productImageView.setImageBitmap(bitmap);
             } else {
-                productImageView.setImageResource(R.drawable.ic_product_placeholder);
+                productImageView.setImageResource(R.drawable.placeholder);
             }
         }
     }

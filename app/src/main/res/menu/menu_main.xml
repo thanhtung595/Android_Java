@@ -6,7 +6,8 @@
         android:id="@+id/action_search"
         android:title="Tìm kiếm"
         android:icon="@android:drawable/ic_menu_search"
-        app:showAsAction="ifRoom" />
+        app:showAsAction="ifRoom|collapseActionView"
+        app:actionViewClass="androidx.appcompat.widget.SearchView" />
 
     <item
         android:id="@+id/action_filter"

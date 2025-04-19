@@ -354,46 +354,35 @@ public class DatabaseManager {
         try {
             // Kiểm tra và tạo kết nối mới nếu cần
             if (connection == null || connection.isClosed()) {
-                Log.e(TAG, "Kết nối đã đóng, tạo kết nối mới");
                 connection = MySQLConnection.getConnection();
-                if (connection == null) {
-                    Log.e(TAG, "Không thể tạo kết nối mới");
-                    return result;
-                }
             }
 
-            String query = "SELECT * FROM products WHERE name LIKE ?";
-            PreparedStatement statement = connection.prepareStatement(query);
+            // Tạo câu truy vấn với LIKE để tìm kiếm một phần
+            String sql = "SELECT * FROM products WHERE name LIKE ?";
+            PreparedStatement statement = connection.prepareStatement(sql);
             statement.setString(1, "%" + keyword + "%");
-            
-            ResultSet resultSet = statement.executeQuery();
-            while (resultSet.next()) {
+
+            ResultSet rs = statement.executeQuery();
+            while (rs.next()) {
                 Jewelry jewelry = new Jewelry();
-                jewelry.setId(resultSet.getInt("id"));
-                jewelry.setName(resultSet.getString("name"));
-                jewelry.setDescription(resultSet.getString("description"));
-                jewelry.setPrice(resultSet.getDouble("price"));
-                jewelry.setStock(resultSet.getInt("stock"));
-                jewelry.setCategory(resultSet.getString("category"));
-                jewelry.setImage(resultSet.getBytes("image"));
-                jewelry.setCreatedBy(resultSet.getInt("created_by"));
-                jewelry.setCreatedAt(resultSet.getTimestamp("created_at"));
-                jewelry.setUpdatedAt(resultSet.getTimestamp("updated_at"));
+                jewelry.setId(rs.getInt("id"));
+                jewelry.setName(rs.getString("name"));
+                jewelry.setDescription(rs.getString("description"));
+                jewelry.setPrice(rs.getDouble("price"));
+                jewelry.setStock(rs.getInt("stock"));
+                jewelry.setCategory(rs.getString("category"));
+                jewelry.setImage(rs.getBytes("image"));
+                jewelry.setCreatedBy(rs.getInt("created_by"));
+                jewelry.setCreatedAt(rs.getTimestamp("created_at"));
+                jewelry.setUpdatedAt(rs.getTimestamp("updated_at"));
                 result.add(jewelry);
             }
-            
-            resultSet.close();
+
+            rs.close();
             statement.close();
         } catch (SQLException e) {
             Log.e(TAG, "Lỗi tìm kiếm sản phẩm: " + e.getMessage());
             e.printStackTrace();
-            // Thử kết nối lại nếu lỗi là do mất kết nối
-            if (e.getMessage().contains("connection closed") || 
-                e.getMessage().contains("Connection refused") ||
-                e.getMessage().contains("Communications link failure")) {
-                Log.d(TAG, "Lỗi kết nối, đang thử kết nối lại...");
-                tryReconnect();
-            }
         }
         return result;
     }

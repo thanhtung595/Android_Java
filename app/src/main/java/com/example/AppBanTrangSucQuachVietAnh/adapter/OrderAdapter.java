@@ -61,7 +61,7 @@ public class OrderAdapter extends RecyclerView.Adapter<OrderAdapter.OrderViewHol
     @Override
     public OrderViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_order, parent, false);
-        return new OrderViewHolder(view);
+        return new OrderViewHolder(view, currencyFormat, dateFormat);
     }
 
     /**
@@ -99,13 +99,17 @@ public class OrderAdapter extends RecyclerView.Adapter<OrderAdapter.OrderViewHol
         public TextView textDate;
         public TextView textTotalAmount;
         public RecyclerView recyclerViewOrderDetails;
+        private final NumberFormat currencyFormat;
+        private final SimpleDateFormat dateFormat;
 
         /**
          * Constructor của ViewHolder
          * @param itemView View của item
          */
-        public OrderViewHolder(@NonNull View itemView) {
+        public OrderViewHolder(@NonNull View itemView, NumberFormat currencyFormat, SimpleDateFormat dateFormat) {
             super(itemView);
+            this.currencyFormat = currencyFormat;
+            this.dateFormat = dateFormat;
             textOrderId = itemView.findViewById(R.id.textOrderId);
             textStatus = itemView.findViewById(R.id.textStatus);
             textDate = itemView.findViewById(R.id.textDate);

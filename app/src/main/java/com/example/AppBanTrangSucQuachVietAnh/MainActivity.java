@@ -52,6 +52,7 @@ public class MainActivity extends AppCompatActivity {
     private View emptyView;
     private SearchView searchView;
     private MenuItem searchMenuItem;
+    private Toolbar toolbar;
 
     /**
      * Khởi tạo Activity và các thành phần giao diện
@@ -89,6 +90,9 @@ public class MainActivity extends AppCompatActivity {
      * Khởi tạo các thành phần giao diện và đối tượng cần thiết
      */
     private void initializeComponents() {
+        toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        
         recyclerView = findViewById(R.id.recyclerView);
         dbManager = DatabaseManager.getInstance();
         jewelryList = new ArrayList<>();
@@ -277,6 +281,10 @@ public class MainActivity extends AppCompatActivity {
         } else if (id == R.id.action_search) {
             showSearchDialog();
             return true;
+        } else if (id == R.id.action_add) {
+            Intent intent = new Intent(this, AddJewelryActivity.class);
+            startActivity(intent);
+            return true;
         }
         
         return super.onOptionsItemSelected(item);
@@ -289,72 +297,52 @@ public class MainActivity extends AppCompatActivity {
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.menu_main, menu);
         
-        // Thiết lập SearchView
-        searchMenuItem = menu.findItem(R.id.action_search);
-        searchView = (SearchView) searchMenuItem.getActionView();
-        setupSearchView();
+        // Lấy SearchView từ menu
+        MenuItem searchItem = menu.findItem(R.id.action_search);
+        SearchView searchView = (SearchView) searchItem.getActionView();
+        
+        if (searchView != null) {
+            // Thiết lập gợi ý tìm kiếm
+            searchView.setQueryHint("Tìm kiếm sản phẩm...");
+            
+            // Thiết lập listener cho sự kiện tìm kiếm
+            searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+                @Override
+                public boolean onQueryTextSubmit(String query) {
+                    // Xử lý khi người dùng nhấn nút tìm kiếm
+                    performSearch(query);
+                    return true;
+                }
+
+                @Override
+                public boolean onQueryTextChange(String newText) {
+                    // Xử lý khi người dùng thay đổi nội dung tìm kiếm
+                    performSearch(newText);
+                    return true;
+                }
+            });
+        }
         
         return true;
     }
 
-    /**
-     * Thiết lập SearchView cho chức năng tìm kiếm
-     */
-    private void setupSearchView() {
-        searchView.setQueryHint("Nhập tên sản phẩm...");
-        searchView.setIconifiedByDefault(false);
-        searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
-            @Override
-            public boolean onQueryTextSubmit(String query) {
-                searchJewelry(query);
-                return true;
+    private void performSearch(String query) {
+        // Thực hiện tìm kiếm với query
+        List<Jewelry> searchResults = dbManager.searchJewelry(query);
+        
+        // Cập nhật RecyclerView với kết quả tìm kiếm
+        if (adapter != null) {
+            if (searchResults != null && !searchResults.isEmpty()) {
+                adapter.updateData(searchResults);
+                textEmpty.setVisibility(View.GONE);
+                recyclerView.setVisibility(View.VISIBLE);
+            } else {
+                adapter.updateData(new ArrayList<>());
+                textEmpty.setText("Không tìm thấy sản phẩm phù hợp");
+                textEmpty.setVisibility(View.VISIBLE);
+                recyclerView.setVisibility(View.GONE);
             }
-
-            @Override
-            public boolean onQueryTextChange(String newText) {
-                if (newText.isEmpty()) {
-                    loadJewelryList();
-                }
-                return true;
-            }
-        });
-    }
-
-    /**
-     * Tìm kiếm sản phẩm theo từ khóa
-     * @param keyword Từ khóa tìm kiếm
-     */
-    private void searchJewelry(String keyword) {
-        if (keyword.trim().isEmpty()) {
-            loadJewelryList();
-            return;
         }
-
-        new Thread(() -> {
-            try {
-                List<Jewelry> searchResults = dbManager.searchJewelry(keyword);
-                runOnUiThread(() -> {
-                    if (searchResults != null && !searchResults.isEmpty()) {
-                        jewelryList.clear();
-                        jewelryList.addAll(searchResults);
-                        adapter.setJewelryList(jewelryList);
-                        textEmpty.setVisibility(View.GONE);
-                        recyclerView.setVisibility(View.VISIBLE);
-                    } else {
-                        jewelryList.clear();
-                        textEmpty.setText("Không tìm thấy sản phẩm phù hợp");
-                        textEmpty.setVisibility(View.VISIBLE);
-                        recyclerView.setVisibility(View.GONE);
-                    }
-                });
-            } catch (Exception e) {
-                Log.e(TAG, "Lỗi tìm kiếm: " + e.getMessage());
-                runOnUiThread(() -> {
-                    Toast.makeText(this, "Lỗi tìm kiếm: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                    loadJewelryList();
-                });
-            }
-        }).start();
     }
 
     private void showSearchDialog() {
@@ -378,7 +366,32 @@ public class MainActivity extends AppCompatActivity {
         builder.setPositiveButton("Tìm kiếm", (dialog, which) -> {
             String keyword = editSearch.getText().toString().trim();
             if (!keyword.isEmpty()) {
-                searchJewelry(keyword);
+                // Thực hiện tìm kiếm thông qua DatabaseManager
+                new Thread(() -> {
+                    try {
+                        List<Jewelry> searchResults = dbManager.searchJewelry(keyword);
+                        runOnUiThread(() -> {
+                            if (searchResults != null && !searchResults.isEmpty()) {
+                                jewelryList.clear();
+                                jewelryList.addAll(searchResults);
+                                adapter.setJewelryList(jewelryList);
+                                textEmpty.setVisibility(View.GONE);
+                                recyclerView.setVisibility(View.VISIBLE);
+                            } else {
+                                jewelryList.clear();
+                                textEmpty.setText("Không tìm thấy sản phẩm phù hợp");
+                                textEmpty.setVisibility(View.VISIBLE);
+                                recyclerView.setVisibility(View.GONE);
+                            }
+                        });
+                    } catch (Exception e) {
+                        Log.e(TAG, "Lỗi tìm kiếm: " + e.getMessage());
+                        runOnUiThread(() -> {
+                            Toast.makeText(this, "Lỗi tìm kiếm: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                            loadJewelryList();
+                        });
+                    }
+                }).start();
             } else {
                 Toast.makeText(this, "Vui lòng nhập tên sản phẩm", Toast.LENGTH_SHORT).show();
             }

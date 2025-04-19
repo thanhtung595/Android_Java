@@ -16,7 +16,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.AppBanTrangSucQuachVietAnh.R;
 import com.example.AppBanTrangSucQuachVietAnh.model.CartItem;
-import com.example.AppBanTrangSucQuachVietAnh.database.DatabaseManager;
+import com.example.AppBanTrangSucQuachVietAnh.data.DatabaseManager;
 
 import java.text.NumberFormat;
 import java.util.List;
@@ -30,14 +30,14 @@ public class CartAdapter extends RecyclerView.Adapter<CartAdapter.ViewHolder> {
     private static final String TAG = "CartAdapter";
     private List<CartItem> cartItems;
     private final NumberFormat currencyFormat;
-    private OnItemClickListener listener;
+    private CartItemListener listener;
 
     /**
      * Interface định nghĩa các sự kiện tương tác với item trong giỏ hàng
      */
-    public interface OnItemClickListener {
-        void onUpdateQuantity(int position, int newQuantity);
-        void onRemoveItem(int position);
+    public interface CartItemListener {
+        void onQuantityChanged(CartItem item, int newQuantity);
+        void onDeleteClick(CartItem item);
     }
 
     /**
@@ -45,7 +45,7 @@ public class CartAdapter extends RecyclerView.Adapter<CartAdapter.ViewHolder> {
      * @param cartItems Danh sách sản phẩm trong giỏ hàng
      * @param listener Listener xử lý các sự kiện
      */
-    public CartAdapter(List<CartItem> cartItems, OnItemClickListener listener) {
+    public CartAdapter(List<CartItem> cartItems, CartItemListener listener) {
         this.cartItems = cartItems;
         this.listener = listener;
         this.currencyFormat = NumberFormat.getCurrencyInstance(new Locale("vi", "VN"));
@@ -100,6 +100,7 @@ public class CartAdapter extends RecyclerView.Adapter<CartAdapter.ViewHolder> {
         private TextView quantityTextView;
         private Button btnRemove;
         private Button btnUpdate;
+        private NumberFormat currencyFormat;
 
         /**
          * Constructor của ViewHolder
@@ -108,11 +109,12 @@ public class CartAdapter extends RecyclerView.Adapter<CartAdapter.ViewHolder> {
         public ViewHolder(View itemView) {
             super(itemView);
             imageView = itemView.findViewById(R.id.imageView);
-            nameTextView = itemView.findViewById(R.id.nameTextView);
-            priceTextView = itemView.findViewById(R.id.priceTextView);
-            quantityTextView = itemView.findViewById(R.id.quantityTextView);
-            btnRemove = itemView.findViewById(R.id.btnRemove);
-            btnUpdate = itemView.findViewById(R.id.btnUpdate);
+            nameTextView = itemView.findViewById(R.id.textName);
+            priceTextView = itemView.findViewById(R.id.textPrice);
+            quantityTextView = itemView.findViewById(R.id.textQuantity);
+            btnRemove = itemView.findViewById(R.id.buttonDelete);
+            btnUpdate = itemView.findViewById(R.id.buttonDecrease);
+            currencyFormat = NumberFormat.getCurrencyInstance(new Locale("vi", "VN"));
         }
 
         /**
@@ -121,7 +123,7 @@ public class CartAdapter extends RecyclerView.Adapter<CartAdapter.ViewHolder> {
          * @param position Vị trí của item trong danh sách
          * @param listener Listener xử lý các sự kiện
          */
-        public void bind(CartItem item, int position, OnItemClickListener listener) {
+        public void bind(CartItem item, int position, CartItemListener listener) {
             // Hiển thị hình ảnh sản phẩm
             if (item.getProductImage() != null) {
                 imageView.setImageBitmap(DatabaseManager.byteArrayToBitmap(item.getProductImage()));
@@ -137,7 +139,7 @@ public class CartAdapter extends RecyclerView.Adapter<CartAdapter.ViewHolder> {
             // Xử lý sự kiện nút xóa
             btnRemove.setOnClickListener(v -> {
                 if (listener != null) {
-                    listener.onRemoveItem(position);
+                    listener.onDeleteClick(item);
                 }
             });
 
@@ -155,7 +157,7 @@ public class CartAdapter extends RecyclerView.Adapter<CartAdapter.ViewHolder> {
                     if (!quantityStr.isEmpty()) {
                         int newQuantity = Integer.parseInt(quantityStr);
                         if (newQuantity > 0) {
-                            listener.onUpdateQuantity(position, newQuantity);
+                            listener.onQuantityChanged(item, newQuantity);
                         } else {
                             Toast.makeText(itemView.getContext(), 
                                 "Số lượng phải lớn hơn 0", Toast.LENGTH_SHORT).show();

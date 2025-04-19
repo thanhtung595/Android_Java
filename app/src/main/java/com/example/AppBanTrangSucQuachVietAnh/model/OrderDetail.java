@@ -3,6 +3,11 @@ package com.example.AppBanTrangSucQuachVietAnh.model;
 import java.io.Serializable;
 
 public class OrderDetail implements Serializable {
+    // Các hằng số trạng thái đơn hàng
+    public static final String STATUS_PENDING = "pending";    // Đơn hàng đang chờ xử lý
+    public static final String STATUS_COMPLETED = "completed"; // Đơn hàng đã hoàn thành
+    public static final String STATUS_CANCELLED = "cancelled"; // Đơn hàng đã hủy
+
     private int id;
     private int orderId;
     private int productId;

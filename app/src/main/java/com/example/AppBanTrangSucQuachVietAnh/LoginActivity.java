@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
@@ -21,8 +22,8 @@ public class LoginActivity extends AppCompatActivity {
     private static final String TAG = "LoginActivity";
     private EditText editUsername;
     private EditText editPassword;
-    private Button btnLogin;
-    private DatabaseManager dbManager;
+    private Button buttonLogin;
+    private DatabaseManager databaseManager;
     private SharedPreferences prefs;
 
     /**
@@ -38,7 +39,7 @@ public class LoginActivity extends AppCompatActivity {
         initializeComponents();
         
         // Thiết lập sự kiện cho nút đăng nhập
-        setupLoginButton();
+        setupEventListeners();
     }
 
     /**
@@ -47,16 +48,16 @@ public class LoginActivity extends AppCompatActivity {
     private void initializeComponents() {
         editUsername = findViewById(R.id.editUsername);
         editPassword = findViewById(R.id.editPassword);
-        btnLogin = findViewById(R.id.btnLogin);
-        dbManager = DatabaseManager.getInstance();
+        buttonLogin = findViewById(R.id.buttonLogin);
+        databaseManager = DatabaseManager.getInstance();
         prefs = getSharedPreferences("login_prefs", MODE_PRIVATE);
     }
 
     /**
      * Thiết lập sự kiện cho nút đăng nhập
      */
-    private void setupLoginButton() {
-        btnLogin.setOnClickListener(v -> {
+    private void setupEventListeners() {
+        buttonLogin.setOnClickListener(v -> {
             String username = editUsername.getText().toString().trim();
             String password = editPassword.getText().toString().trim();
 
@@ -74,17 +75,18 @@ public class LoginActivity extends AppCompatActivity {
             // Thực hiện đăng nhập trong thread riêng
             new Thread(() -> {
                 try {
-                    Account account = dbManager.checkLogin(username, password);
+                    Account account = databaseManager.checkLogin(username, password);
                     runOnUiThread(() -> {
                         progressDialog.dismiss();
                         if (account != null) {
                             // Lưu thông tin đăng nhập
                             saveLoginInfo(account);
                             // Chuyển đến MainActivity
-                            startActivity(new Intent(this, MainActivity.class));
+                            Intent intent = new Intent(LoginActivity.this, MainActivity.class);
+                            startActivity(intent);
                             finish();
                         } else {
-                            Toast.makeText(this, "Tên đăng nhập hoặc mật khẩu không đúng", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(this, "Đăng nhập thất bại", Toast.LENGTH_SHORT).show();
                         }
                     });
                 } catch (Exception e) {
@@ -105,10 +107,10 @@ public class LoginActivity extends AppCompatActivity {
         SharedPreferences.Editor editor = prefs.edit();
         editor.putString("username", account.getUsername());
         editor.putString("password", account.getPassword());
-        editor.putString("user_role", account.getRole());
+        editor.putString("role", account.getRole());
         editor.putInt("user_id", account.getId());
         editor.apply();
-        Log.d(TAG, "Đã lưu thông tin đăng nhập cho user: " + account.getUsername() + ", ID: " + account.getId());
+        Log.d(TAG, "Saved login info for user: " + account.getUsername() + ", ID: " + account.getId());
     }
 
     /**
@@ -117,8 +119,8 @@ public class LoginActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (dbManager != null) {
-            dbManager.close();
+        if (databaseManager != null) {
+            databaseManager.close();
         }
     }
 } 

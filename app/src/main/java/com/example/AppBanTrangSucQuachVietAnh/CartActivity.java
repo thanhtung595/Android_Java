@@ -1,6 +1,8 @@
 package com.example.AppBanTrangSucQuachVietAnh;
 
+import android.app.AlertDialog;
 import android.os.Bundle;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
@@ -45,6 +47,13 @@ public class CartActivity extends AppCompatActivity implements CartAdapter.CartI
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_cart);
+
+        // Thiết lập toolbar với nút back
+        Toolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        getSupportActionBar().setDisplayShowHomeEnabled(true);
+        getSupportActionBar().setTitle("Giỏ hàng");
 
         // Khởi tạo các thành phần
         initializeComponents();
@@ -212,5 +221,14 @@ public class CartActivity extends AppCompatActivity implements CartAdapter.CartI
         if (databaseManager != null) {
             databaseManager.close();
         }
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == android.R.id.home) {
+            onBackPressed();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 } 
