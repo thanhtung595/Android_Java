@@ -33,6 +33,7 @@ public class LoginActivity extends AppCompatActivity {
 
         // Khởi tạo DatabaseManager
         databaseManager = DatabaseManager.getInstance();
+        databaseManager.initialize();
 
         // Khởi tạo các view
         initViews();
@@ -101,8 +102,23 @@ public class LoginActivity extends AppCompatActivity {
         editor.putString("username", username);
         editor.putString("password", password);
         editor.putString("user_role", role);
+        
+        // Lấy account_id từ database
+        new Thread(() -> {
+            try {
+                Account account = databaseManager.checkLogin(username, password);
+                if (account != null) {
+                    runOnUiThread(() -> {
+                        editor.putInt("account_id", account.getId());
+                        editor.apply();
+                    });
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Lỗi khi lấy account_id: " + e.getMessage(), e);
+            }
+        }).start();
+        
         editor.apply();
-        Log.d(TAG, "Đã lưu thông tin đăng nhập: " + username + ", quyền: " + role);
     }
 
     /**

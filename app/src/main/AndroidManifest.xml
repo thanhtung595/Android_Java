@@ -17,7 +17,7 @@
         tools:targetApi="31">
         
         <activity
-            android:name="com.example.AppBanTrangSucQuachVietAnh.LoginActivity"
+            android:name=".LoginActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -26,16 +26,26 @@
         </activity>
 
         <activity
-            android:name="com.example.AppBanTrangSucQuachVietAnh.MainActivity"
+            android:name=".MainActivity"
             android:exported="false" />
 
         <activity
-            android:name="com.example.AppBanTrangSucQuachVietAnh.AddJewelryActivity"
+            android:name=".AddJewelryActivity"
             android:exported="false" />
 
         <activity
-            android:name="com.example.AppBanTrangSucQuachVietAnh.EditJewelryActivity"
+            android:name=".EditJewelryActivity"
             android:exported="false" />
+
+        <activity
+            android:name=".CartActivity"
+            android:label="Shopping Cart"
+            android:parentActivityName=".MainActivity" />
+
+        <activity
+            android:name=".CheckoutActivity"
+            android:label="Checkout"
+            android:parentActivityName=".CartActivity" />
     </application>
 
 </manifest>

@@ -9,6 +9,7 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -21,6 +22,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.AppBanTrangSucQuachVietAnh.adapter.JewelryAdapter;
 import com.example.AppBanTrangSucQuachVietAnh.data.DatabaseManager;
+import com.example.AppBanTrangSucQuachVietAnh.model.CartItem;
 import com.example.AppBanTrangSucQuachVietAnh.model.Jewelry;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import java.util.List;
@@ -122,19 +124,29 @@ public class MainActivity extends AppCompatActivity {
                 isAdmin,
                 // Xử lý sự kiện xóa
                 jewelry -> {
-                    new AlertDialog.Builder(this)
-                        .setTitle("Xác nhận xóa")
-                        .setMessage("Bạn có chắc chắn muốn xóa sản phẩm này?")
-                        .setPositiveButton("Xóa", (dialog, which) -> deleteJewelry(jewelry))
-                        .setNegativeButton("Hủy", null)
-                        .show();
+                    if (isAdmin) {
+                        new AlertDialog.Builder(this)
+                            .setTitle("Xác nhận xóa")
+                            .setMessage("Bạn có chắc chắn muốn xóa sản phẩm này?")
+                            .setPositiveButton("Xóa", (dialog, which) -> deleteJewelry(jewelry))
+                            .setNegativeButton("Hủy", null)
+                            .show();
+                    } else {
+                        // Thêm vào giỏ hàng cho user
+                        addToCart(jewelry);
+                    }
                 },
                 // Xử lý sự kiện click vào item
                 jewelry -> {
                     Log.d(TAG, "Click vào sản phẩm: " + jewelry.getId());
-                    Intent intent = new Intent(this, EditJewelryActivity.class);
-                    intent.putExtra("jewelry_id", jewelry.getId());
-                    startActivity(intent);
+                    if (isAdmin) {
+                        Intent intent = new Intent(this, EditJewelryActivity.class);
+                        intent.putExtra("jewelry_id", jewelry.getId());
+                        startActivity(intent);
+                    } else {
+                        // Thêm vào giỏ hàng cho user
+                        addToCart(jewelry);
+                    }
                 }
             );
             
@@ -196,15 +208,12 @@ public class MainActivity extends AppCompatActivity {
      */
     private void loadJewelryData() {
         runOnUiThread(() -> showLoading());
-        
+
         new Thread(() -> {
             try {
-                // Kiểm tra cấu trúc bảng trước khi lấy dữ liệu
-                databaseManager.checkProductsTable();
-                
                 // Lấy danh sách sản phẩm
                 List<Jewelry> jewelryList = databaseManager.getAllJewelry();
-                
+
                 // Cập nhật UI trên main thread
                 runOnUiThread(() -> {
                     hideLoading();
@@ -214,6 +223,7 @@ public class MainActivity extends AppCompatActivity {
                     } else {
                         showEmptyView();
                     }
+                    databaseManager.close();
                 });
             } catch (Exception e) {
                 Log.e(TAG, "Lỗi tải danh sách sản phẩm: " + e.getMessage(), e);
@@ -222,9 +232,6 @@ public class MainActivity extends AppCompatActivity {
                     showError("Không thể tải danh sách sản phẩm");
                     showEmptyView();
                 });
-            } finally {
-                // Đóng kết nối sau khi hoàn thành
-                databaseManager.close();
             }
         }).start();
     }
@@ -292,6 +299,10 @@ public class MainActivity extends AppCompatActivity {
         } else if (item.getItemId() == R.id.action_search) {
             showSearchDialog();
             return true;
+        } else if (item.getItemId() == R.id.action_cart) {
+            Intent intent = new Intent(this, CartActivity.class);
+            startActivity(intent);
+            return true;
         }
         return super.onOptionsItemSelected(item);
     }
@@ -301,7 +312,7 @@ public class MainActivity extends AppCompatActivity {
      */
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.menu_main, menu);
+        getMenuInflater().inflate(R.menu.main_menu, menu);
         return true;
     }
 
@@ -396,5 +407,80 @@ public class MainActivity extends AppCompatActivity {
                 });
             }
         }).start();
+    }
+
+    private void addToCart(Jewelry jewelry) {
+        // Tạo dialog
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        View dialogView = getLayoutInflater().inflate(R.layout.dialog_add_to_cart, null);
+        builder.setView(dialogView);
+
+        // Lấy các view từ dialog
+        TextView tvProductName = dialogView.findViewById(R.id.tvProductName);
+        TextView tvProductPrice = dialogView.findViewById(R.id.tvProductPrice);
+        TextView tvQuantity = dialogView.findViewById(R.id.tvQuantity);
+        Button btnDecrease = dialogView.findViewById(R.id.btnDecrease);
+        Button btnIncrease = dialogView.findViewById(R.id.btnIncrease);
+        Button btnCancel = dialogView.findViewById(R.id.btnCancel);
+        Button btnConfirm = dialogView.findViewById(R.id.btnConfirm);
+
+        // Hiển thị thông tin sản phẩm
+        tvProductName.setText(jewelry.getName());
+        tvProductPrice.setText(String.format("$%.2f", jewelry.getPrice()));
+
+        // Xử lý tăng/giảm số lượng
+        btnIncrease.setOnClickListener(v -> {
+            int quantity = Integer.parseInt(tvQuantity.getText().toString());
+            tvQuantity.setText(String.valueOf(quantity + 1));
+        });
+
+        btnDecrease.setOnClickListener(v -> {
+            int quantity = Integer.parseInt(tvQuantity.getText().toString());
+            if (quantity > 1) {
+                tvQuantity.setText(String.valueOf(quantity - 1));
+            }
+        });
+
+        // Tạo và hiển thị dialog
+        AlertDialog dialog = builder.create();
+        dialog.show();
+
+        // Xử lý nút hủy
+        btnCancel.setOnClickListener(v -> dialog.dismiss());
+
+        // Xử lý nút xác nhận
+        btnConfirm.setOnClickListener(v -> {
+            int quantity = Integer.parseInt(tvQuantity.getText().toString());
+            
+            // Tạo CartItem mới
+            CartItem cartItem = new CartItem();
+            cartItem.setProduct(jewelry);
+            cartItem.setQuantity(quantity);
+            cartItem.setPrice(jewelry.getPrice());
+
+            // Lưu vào database
+            new Thread(() -> {
+                try {
+                    // Lấy accountId từ SharedPreferences
+                    SharedPreferences prefs = getSharedPreferences("login_prefs", MODE_PRIVATE);
+                    int accountId = prefs.getInt("account_id", -1);
+
+                    if (accountId != -1) {
+                        // Lưu vào database
+                        DatabaseManager dbManager = DatabaseManager.getInstance();
+                        dbManager.addToCart(accountId, cartItem);
+                        
+                        runOnUiThread(() -> {
+                            Toast.makeText(this, "Đã thêm vào giỏ hàng", Toast.LENGTH_SHORT).show();
+                            dialog.dismiss();
+                        });
+                    }
+                } catch (Exception e) {
+                    runOnUiThread(() -> {
+                        Toast.makeText(this, "Lỗi khi thêm vào giỏ hàng", Toast.LENGTH_SHORT).show();
+                    });
+                }
+            }).start();
+        });
     }
 }
