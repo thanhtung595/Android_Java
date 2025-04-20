@@ -46,10 +46,21 @@ public class MySQLConnection {
             // Tạo URL kết nối
             String url = String.format("jdbc:mysql://%s:%d/%s", HOST, PORT, DATABASE);
             Log.d(TAG, "URL kết nối: " + url);
+            Log.d(TAG, "Username: " + USERNAME);
+            Log.d(TAG, "Password: " + (PASSWORD.isEmpty() ? "empty" : "set"));
             
             // Tạo kết nối mới
             connection = DriverManager.getConnection(url, USERNAME, PASSWORD);
             Log.d(TAG, "Đã kết nối thành công đến MySQL");
+            
+            // Kiểm tra kết nối
+            if (connection != null) {
+                Log.d(TAG, "Kết nối không null");
+                Log.d(TAG, "Kết nối đóng: " + connection.isClosed());
+                Log.d(TAG, "Kết nối hợp lệ: " + connection.isValid(1));
+            } else {
+                Log.e(TAG, "Kết nối là null");
+            }
             
             return connection;
         } catch (ClassNotFoundException e) {
@@ -57,6 +68,8 @@ public class MySQLConnection {
             throw new SQLException("Không tìm thấy MySQL driver", e);
         } catch (SQLException e) {
             Log.e(TAG, "Lỗi kết nối MySQL: " + e.getMessage(), e);
+            Log.e(TAG, "SQL State: " + e.getSQLState());
+            Log.e(TAG, "Error Code: " + e.getErrorCode());
             throw e;
         }
     }

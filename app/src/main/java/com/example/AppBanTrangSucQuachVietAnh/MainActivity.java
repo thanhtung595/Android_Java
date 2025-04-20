@@ -193,55 +193,35 @@ public class MainActivity extends AppCompatActivity {
      * Cập nhật giao diện với danh sách sản phẩm hoặc thông báo trống
      */
     private void loadJewelryData() {
-        Log.d(TAG, "Bắt đầu tải danh sách sản phẩm");
-        
-        // Hiển thị loading trên main thread
-        runOnUiThread(() -> showLoading());
-
+        showLoading();
         new Thread(() -> {
             try {
-                // Kiểm tra kết nối database
-                if (databaseManager == null) {
-                    Log.e(TAG, "DatabaseManager chưa được khởi tạo");
-                    runOnUiThread(() -> {
-                        hideLoading();
-                        showError("Lỗi kết nối cơ sở dữ liệu");
-                    });
-                    return;
-                }
-
-                // Kiểm tra kết nối
-                if (!databaseManager.checkConnection()) {
-                    Log.e(TAG, "Không thể kết nối đến cơ sở dữ liệu");
-                    runOnUiThread(() -> {
-                        hideLoading();
-                        showError("Không thể kết nối đến cơ sở dữ liệu");
-                    });
-                    return;
-                }
-
-                Log.d(TAG, "Đang lấy danh sách sản phẩm từ database");
+                // Kiểm tra cấu trúc bảng trước khi lấy dữ liệu
+                databaseManager.checkProductsTable();
+                
+                // Lấy danh sách sản phẩm
                 List<Jewelry> jewelryList = databaseManager.getAllJewelry();
-                Log.d(TAG, "Số lượng sản phẩm lấy được: " + (jewelryList != null ? jewelryList.size() : 0));
-
+                
                 // Cập nhật UI trên main thread
                 runOnUiThread(() -> {
                     hideLoading();
-                    if (jewelryList == null || jewelryList.isEmpty()) {
-                        Log.d(TAG, "Không có sản phẩm nào");
-                        showEmptyView();
-                    } else {
-                        Log.d(TAG, "Hiển thị " + jewelryList.size() + " sản phẩm");
-                        hideEmptyView();
+                    if (jewelryList != null && !jewelryList.isEmpty()) {
                         adapter.setJewelryList(jewelryList);
+                        hideEmptyView();
+                    } else {
+                        showEmptyView();
                     }
                 });
             } catch (Exception e) {
                 Log.e(TAG, "Lỗi tải danh sách sản phẩm: " + e.getMessage(), e);
                 runOnUiThread(() -> {
                     hideLoading();
-                    showError("Lỗi tải danh sách sản phẩm: " + e.getMessage());
+                    showError("Không thể tải danh sách sản phẩm");
+                    showEmptyView();
                 });
+            } finally {
+                // Đóng kết nối sau khi hoàn thành
+                databaseManager.close();
             }
         }).start();
     }

@@ -23,6 +23,7 @@ public class DatabaseManager {
     private static final String TAG = "DatabaseManager";
     private static DatabaseManager instance;
     private Connection connection;
+    private final Object lock = new Object(); // Thêm lock object để đồng bộ hóa
 
     /**
      * Constructor riêng cho Singleton pattern
@@ -45,26 +46,28 @@ public class DatabaseManager {
      * @return true nếu kết nối thành công
      */
     public boolean checkConnection() {
-        Log.d(TAG, "Đang kiểm tra kết nối database...");
-        try {
-            if (connection == null || connection.isClosed()) {
-                Log.d(TAG, "Kết nối null hoặc đã đóng, thử kết nối lại");
-                connection = MySQLConnection.getConnection();
-            }
-            
-            if (connection != null && !connection.isClosed()) {
-                try (Statement stmt = connection.createStatement()) {
-                    stmt.execute("SELECT 1");
-                    Log.d(TAG, "Kiểm tra kết nối thành công");
-                    return true;
+        synchronized (lock) {
+            Log.d(TAG, "Đang kiểm tra kết nối database...");
+            try {
+                if (connection == null || connection.isClosed()) {
+                    Log.d(TAG, "Kết nối null hoặc đã đóng, thử kết nối lại");
+                    connection = MySQLConnection.getConnection();
                 }
+                
+                if (connection != null && !connection.isClosed()) {
+                    try (Statement stmt = connection.createStatement()) {
+                        stmt.execute("SELECT 1");
+                        Log.d(TAG, "Kiểm tra kết nối thành công");
+                        return true;
+                    }
+                }
+                Log.e(TAG, "Không thể tạo kết nối");
+                return false;
+            } catch (SQLException e) {
+                Log.e(TAG, "Lỗi kiểm tra kết nối: " + e.getMessage(), e);
+                tryReconnect();
+                return false;
             }
-            Log.e(TAG, "Không thể tạo kết nối");
-            return false;
-        } catch (SQLException e) {
-            Log.e(TAG, "Lỗi kiểm tra kết nối: " + e.getMessage(), e);
-            tryReconnect();
-            return false;
         }
     }
 
@@ -121,52 +124,48 @@ public class DatabaseManager {
     public List<Jewelry> getAllJewelry() {
         List<Jewelry> jewelryList = new ArrayList<>();
         String sql = "SELECT * FROM products ORDER BY created_at DESC";
-        Statement stmt = null;
-        ResultSet rs = null;
         
-        // Kiểm tra và khôi phục kết nối nếu cần
-        if (!checkConnection()) {
-            Log.d(TAG, "Kết nối đã đóng, đang thử kết nối lại...");
-            tryReconnect();
+        synchronized (lock) {
+            // Kiểm tra và khôi phục kết nối nếu cần
             if (!checkConnection()) {
-                Log.e(TAG, "Không thể kết nối lại database");
-                return jewelryList;
+                Log.d(TAG, "Kết nối đã đóng, đang thử kết nối lại...");
+                tryReconnect();
+                if (!checkConnection()) {
+                    Log.e(TAG, "Không thể kết nối lại database");
+                    return jewelryList;
+                }
             }
-        }
 
-        try {
-            stmt = connection.createStatement();
-            rs = stmt.executeQuery(sql);
-            
-            while (rs.next()) {
-                Jewelry jewelry = new Jewelry();
-                jewelry.setId(rs.getInt("id"));
-                jewelry.setName(rs.getString("name"));
-                jewelry.setDescription(rs.getString("description"));
-                jewelry.setPrice(rs.getDouble("price"));
-                jewelry.setStock(rs.getInt("stock"));
-                jewelry.setCategory(rs.getString("category"));
-                jewelry.setImage(rs.getBytes("image"));
-                jewelry.setCreatedBy(rs.getInt("created_by"));
-                jewelry.setCreatedAt(rs.getTimestamp("created_at"));
-                jewelry.setUpdatedAt(rs.getTimestamp("updated_at"));
-                jewelryList.add(jewelry);
-            }
-            
-            Log.d(TAG, "Lấy danh sách sản phẩm thành công: " + jewelryList.size() + " sản phẩm");
-            return jewelryList;
-        } catch (SQLException e) {
-            Log.e(TAG, "Lỗi lấy danh sách sản phẩm: " + e.getMessage(), e);
-            return jewelryList;
-        } finally {
-            // Đóng ResultSet và Statement trong khối finally
-            try {
-                if (rs != null) rs.close();
-                if (stmt != null) stmt.close();
+            try (Statement stmt = connection.createStatement();
+                 ResultSet rs = stmt.executeQuery(sql)) {
+                
+                while (rs.next()) {
+                    try {
+                        Jewelry jewelry = new Jewelry();
+                        jewelry.setId(rs.getInt("id"));
+                        jewelry.setName(rs.getString("name"));
+                        jewelry.setDescription(rs.getString("description"));
+                        jewelry.setPrice(rs.getDouble("price"));
+                        jewelry.setStock(rs.getInt("stock"));
+                        jewelry.setCategory(rs.getString("category"));
+                        jewelry.setImage(rs.getBytes("image"));
+                        jewelry.setCreatedBy(rs.getInt("created_by"));
+                        jewelry.setCreatedAt(rs.getTimestamp("created_at"));
+                        jewelry.setUpdatedAt(rs.getTimestamp("updated_at"));
+                        jewelryList.add(jewelry);
+                    } catch (SQLException e) {
+                        Log.e(TAG, "Lỗi khi đọc dữ liệu sản phẩm: " + e.getMessage(), e);
+                        continue;
+                    }
+                }
+                
+                Log.d(TAG, "Lấy danh sách sản phẩm thành công: " + jewelryList.size() + " sản phẩm");
             } catch (SQLException e) {
-                Log.e(TAG, "Lỗi đóng ResultSet/Statement: " + e.getMessage(), e);
+                Log.e(TAG, "Lỗi lấy danh sách sản phẩm: " + e.getMessage(), e);
             }
         }
+        
+        return jewelryList;
     }
 
     /**
@@ -560,6 +559,49 @@ public class DatabaseManager {
             }
         } catch (SQLException e) {
             Log.e(TAG, "Error closing resources: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Kiểm tra cấu trúc bảng products
+     */
+    public void checkProductsTable() {
+        synchronized (lock) {
+            if (!checkConnection()) {
+                Log.e(TAG, "Không thể kết nối đến database");
+                return;
+            }
+
+            try {
+                DatabaseMetaData metaData = connection.getMetaData();
+                try (ResultSet tables = metaData.getTables(null, null, "products", null)) {
+                    if (tables.next()) {
+                        Log.d(TAG, "Bảng products tồn tại");
+                        
+                        // Kiểm tra các cột
+                        try (ResultSet columns = metaData.getColumns(null, null, "products", null)) {
+                            while (columns.next()) {
+                                String columnName = columns.getString("COLUMN_NAME");
+                                String columnType = columns.getString("TYPE_NAME");
+                                Log.d(TAG, "Cột: " + columnName + " - Kiểu: " + columnType);
+                            }
+                        }
+                        
+                        // Đếm số lượng bản ghi
+                        try (Statement stmt = connection.createStatement();
+                             ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM products")) {
+                            if (rs.next()) {
+                                int count = rs.getInt(1);
+                                Log.d(TAG, "Số lượng sản phẩm trong bảng: " + count);
+                            }
+                        }
+                    } else {
+                        Log.e(TAG, "Bảng products không tồn tại");
+                    }
+                }
+            } catch (SQLException e) {
+                Log.e(TAG, "Lỗi kiểm tra bảng products: " + e.getMessage(), e);
+            }
         }
     }
 } 
