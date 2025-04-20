@@ -9,6 +9,8 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.appcompat.app.AlertDialog;
@@ -287,6 +289,9 @@ public class MainActivity extends AppCompatActivity {
             startActivity(intent);
             finish();
             return true;
+        } else if (item.getItemId() == R.id.action_search) {
+            showSearchDialog();
+            return true;
         }
         return super.onOptionsItemSelected(item);
     }
@@ -337,5 +342,59 @@ public class MainActivity extends AppCompatActivity {
         if (databaseManager != null) {
             databaseManager.close();
         }
+    }
+
+    private void showSearchDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Tìm kiếm sản phẩm");
+
+        // Tạo layout cho dialog
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(40, 20, 40, 20);
+
+        // Tạo EditText để nhập tên sản phẩm
+        EditText input = new EditText(this);
+        input.setHint("Nhập tên sản phẩm cần tìm (để trống để xem tất cả)");
+        layout.addView(input);
+
+        builder.setView(layout);
+
+        // Thêm nút tìm kiếm
+        builder.setPositiveButton("Tìm kiếm", (dialog, which) -> {
+            String searchText = input.getText().toString().trim();
+            searchJewelry(searchText);
+        });
+
+        // Thêm nút hủy
+        builder.setNegativeButton("Hủy", (dialog, which) -> dialog.cancel());
+
+        builder.show();
+    }
+
+    private void searchJewelry(String searchText) {
+        showLoading();
+        new Thread(() -> {
+            try {
+                List<Jewelry> searchResults = databaseManager.searchJewelry(searchText);
+                runOnUiThread(() -> {
+                    hideLoading();
+                    if (searchResults != null && !searchResults.isEmpty()) {
+                        adapter.setJewelryList(searchResults);
+                        hideEmptyView();
+                    } else {
+                        showEmptyView();
+                        Toast.makeText(this, "Không tìm thấy sản phẩm phù hợp", Toast.LENGTH_SHORT).show();
+                    }
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "Lỗi tìm kiếm sản phẩm: " + e.getMessage(), e);
+                runOnUiThread(() -> {
+                    hideLoading();
+                    showError("Lỗi khi tìm kiếm sản phẩm");
+                    showEmptyView();
+                });
+            }
+        }).start();
     }
 }

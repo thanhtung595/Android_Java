@@ -337,32 +337,49 @@ public class DatabaseManager {
      */
     public List<Jewelry> searchJewelry(String keyword) {
         List<Jewelry> jewelryList = new ArrayList<>();
-        String sql = "SELECT * FROM products WHERE name LIKE ? OR category LIKE ? ORDER BY created_at DESC";
+        String sql;
+        PreparedStatement stmt;
         
-        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-            String searchPattern = "%" + keyword + "%";
-            stmt.setString(1, searchPattern);
-            stmt.setString(2, searchPattern);
-            
-            try (ResultSet rs = stmt.executeQuery()) {
-                while (rs.next()) {
-                    Jewelry jewelry = new Jewelry();
-                    jewelry.setId(rs.getInt("id"));
-                    jewelry.setName(rs.getString("name"));
-                    jewelry.setDescription(rs.getString("description"));
-                    jewelry.setPrice(rs.getDouble("price"));
-                    jewelry.setStock(rs.getInt("stock"));
-                    jewelry.setCategory(rs.getString("category"));
-                    jewelry.setImage(rs.getBytes("image"));
-                    jewelry.setCreatedBy(rs.getInt("created_by"));
-                    jewelry.setCreatedAt(rs.getTimestamp("created_at"));
-                    jewelry.setUpdatedAt(rs.getTimestamp("updated_at"));
-                    jewelryList.add(jewelry);
-                }
+        synchronized (lock) {
+            if (!checkConnection()) {
+                Log.e(TAG, "Không thể kết nối đến database");
+                return jewelryList;
             }
-        } catch (SQLException e) {
-            Log.e(TAG, "Lỗi tìm kiếm sản phẩm: " + e.getMessage(), e);
+
+            try {
+                if (keyword == null || keyword.trim().isEmpty()) {
+                    // Nếu không có từ khóa, lấy tất cả sản phẩm
+                    sql = "SELECT * FROM products ORDER BY created_at DESC";
+                    stmt = connection.prepareStatement(sql);
+                } else {
+                    // Nếu có từ khóa, tìm kiếm theo tên
+                    sql = "SELECT * FROM products WHERE name LIKE ? ORDER BY created_at DESC";
+                    stmt = connection.prepareStatement(sql);
+                    stmt.setString(1, "%" + keyword + "%");
+                }
+                
+                try (ResultSet rs = stmt.executeQuery()) {
+                    while (rs.next()) {
+                        Jewelry jewelry = new Jewelry();
+                        jewelry.setId(rs.getInt("id"));
+                        jewelry.setName(rs.getString("name"));
+                        jewelry.setDescription(rs.getString("description"));
+                        jewelry.setPrice(rs.getDouble("price"));
+                        jewelry.setStock(rs.getInt("stock"));
+                        jewelry.setCategory(rs.getString("category"));
+                        jewelry.setImage(rs.getBytes("image"));
+                        jewelry.setCreatedBy(rs.getInt("created_by"));
+                        jewelry.setCreatedAt(rs.getTimestamp("created_at"));
+                        jewelry.setUpdatedAt(rs.getTimestamp("updated_at"));
+                        jewelryList.add(jewelry);
+                    }
+                }
+                Log.d(TAG, "Tìm thấy " + jewelryList.size() + " sản phẩm");
+            } catch (SQLException e) {
+                Log.e(TAG, "Lỗi tìm kiếm sản phẩm: " + e.getMessage(), e);
+            }
         }
+        
         return jewelryList;
     }
 
