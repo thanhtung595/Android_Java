@@ -88,20 +88,43 @@ public class EditJewelryActivity extends AppCompatActivity {
         
         // Lấy thông tin sản phẩm từ Intent
         Intent intent = getIntent();
-        if (intent != null && intent.hasExtra("jewelry")) {
-            jewelry = (Jewelry) intent.getSerializableExtra("jewelry");
-            if (jewelry != null) {
-                jewelryId = jewelry.getId();
-                Log.d(TAG, "Nhận dữ liệu sản phẩm với ID: " + jewelryId);
-                populateFields(jewelry);
+        if (intent != null && intent.hasExtra("jewelry_id")) {
+            jewelryId = intent.getIntExtra("jewelry_id", -1);
+            if (jewelryId != -1) {
+                Log.d(TAG, "Nhận ID sản phẩm: " + jewelryId);
+                // Lấy thông tin sản phẩm từ database
+                new Thread(() -> {
+                    try {
+                        jewelry = databaseManager.getJewelryById(jewelryId);
+                        if (jewelry != null) {
+                            runOnUiThread(() -> {
+                                populateFields(jewelry);
+                                hideProgressDialog();
+                            });
+                        } else {
+                            runOnUiThread(() -> {
+                                hideProgressDialog();
+                                Toast.makeText(this, "Không tìm thấy sản phẩm", Toast.LENGTH_SHORT).show();
+                                finish();
+                            });
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "Lỗi lấy thông tin sản phẩm: " + e.getMessage(), e);
+                        runOnUiThread(() -> {
+                            hideProgressDialog();
+                            Toast.makeText(this, "Lỗi khi lấy thông tin sản phẩm", Toast.LENGTH_SHORT).show();
+                            finish();
+                        });
+                    }
+                }).start();
             } else {
-                Log.e(TAG, "Nhận được đối tượng jewelry null");
-                Toast.makeText(this, "Dữ liệu sản phẩm không hợp lệ", Toast.LENGTH_SHORT).show();
+                Log.e(TAG, "ID sản phẩm không hợp lệ");
+                Toast.makeText(this, "ID sản phẩm không hợp lệ", Toast.LENGTH_SHORT).show();
                 finish();
             }
         } else {
-            Log.e(TAG, "Không có dữ liệu sản phẩm trong intent");
-            Toast.makeText(this, "Không có dữ liệu sản phẩm", Toast.LENGTH_SHORT).show();
+            Log.e(TAG, "Không nhận được ID sản phẩm");
+            Toast.makeText(this, "Không nhận được ID sản phẩm", Toast.LENGTH_SHORT).show();
             finish();
         }
 

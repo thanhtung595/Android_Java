@@ -47,25 +47,15 @@ public class DatabaseManager {
      */
     public boolean checkConnection() {
         synchronized (lock) {
-            Log.d(TAG, "Đang kiểm tra kết nối database...");
             try {
                 if (connection == null || connection.isClosed()) {
-                    Log.d(TAG, "Kết nối null hoặc đã đóng, thử kết nối lại");
+                    Log.d(TAG, "Kết nối chưa tồn tại hoặc đã đóng, đang tạo kết nối mới...");
                     connection = MySQLConnection.getConnection();
+                    return connection != null && !connection.isClosed();
                 }
-                
-                if (connection != null && !connection.isClosed()) {
-                    try (Statement stmt = connection.createStatement()) {
-                        stmt.execute("SELECT 1");
-                        Log.d(TAG, "Kiểm tra kết nối thành công");
-                        return true;
-                    }
-                }
-                Log.e(TAG, "Không thể tạo kết nối");
-                return false;
+                return true;
             } catch (SQLException e) {
                 Log.e(TAG, "Lỗi kiểm tra kết nối: " + e.getMessage(), e);
-                tryReconnect();
                 return false;
             }
         }
@@ -568,39 +558,59 @@ public class DatabaseManager {
     public void checkProductsTable() {
         synchronized (lock) {
             if (!checkConnection()) {
-                Log.e(TAG, "Không thể kết nối đến database");
+                Log.e(TAG, "Không thể kiểm tra bảng products do không có kết nối");
                 return;
             }
 
-            try {
-                DatabaseMetaData metaData = connection.getMetaData();
-                try (ResultSet tables = metaData.getTables(null, null, "products", null)) {
-                    if (tables.next()) {
-                        Log.d(TAG, "Bảng products tồn tại");
-                        
-                        // Kiểm tra các cột
-                        try (ResultSet columns = metaData.getColumns(null, null, "products", null)) {
-                            while (columns.next()) {
-                                String columnName = columns.getString("COLUMN_NAME");
-                                String columnType = columns.getString("TYPE_NAME");
-                                Log.d(TAG, "Cột: " + columnName + " - Kiểu: " + columnType);
-                            }
-                        }
-                        
-                        // Đếm số lượng bản ghi
-                        try (Statement stmt = connection.createStatement();
-                             ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM products")) {
-                            if (rs.next()) {
-                                int count = rs.getInt(1);
-                                Log.d(TAG, "Số lượng sản phẩm trong bảng: " + count);
-                            }
-                        }
-                    } else {
-                        Log.e(TAG, "Bảng products không tồn tại");
+            try (Statement stmt = connection.createStatement()) {
+                // Kiểm tra xem bảng products có tồn tại không
+                ResultSet rs = stmt.executeQuery("SHOW TABLES LIKE 'products'");
+                if (!rs.next()) {
+                    Log.d(TAG, "Bảng products không tồn tại, đang tạo bảng mới...");
+                    createProductsTable();
+                } else {
+                    Log.d(TAG, "Bảng products đã tồn tại");
+                    
+                    // Kiểm tra cấu trúc bảng
+                    rs = stmt.executeQuery("DESCRIBE products");
+                    while (rs.next()) {
+                        Log.d(TAG, "Cột: " + rs.getString("Field") + 
+                              ", Kiểu: " + rs.getString("Type") + 
+                              ", Null: " + rs.getString("Null") + 
+                              ", Key: " + rs.getString("Key"));
+                    }
+                    
+                    // Đếm số bản ghi
+                    rs = stmt.executeQuery("SELECT COUNT(*) as count FROM products");
+                    if (rs.next()) {
+                        Log.d(TAG, "Số bản ghi trong bảng products: " + rs.getInt("count"));
                     }
                 }
             } catch (SQLException e) {
                 Log.e(TAG, "Lỗi kiểm tra bảng products: " + e.getMessage(), e);
+            }
+        }
+    }
+
+    private void createProductsTable() {
+        synchronized (lock) {
+            try (Statement stmt = connection.createStatement()) {
+                String sql = "CREATE TABLE IF NOT EXISTS products (" +
+                           "id INT AUTO_INCREMENT PRIMARY KEY, " +
+                           "name VARCHAR(255) NOT NULL, " +
+                           "description TEXT, " +
+                           "price DOUBLE NOT NULL, " +
+                           "stock INT NOT NULL, " +
+                           "category VARCHAR(100), " +
+                           "image LONGBLOB, " +
+                           "created_by INT, " +
+                           "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                           "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP" +
+                           ")";
+                stmt.execute(sql);
+                Log.d(TAG, "Đã tạo bảng products thành công");
+            } catch (SQLException e) {
+                Log.e(TAG, "Lỗi tạo bảng products: " + e.getMessage(), e);
             }
         }
     }

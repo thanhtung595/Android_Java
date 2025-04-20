@@ -131,7 +131,7 @@ public class MainActivity extends AppCompatActivity {
                 jewelry -> {
                     Log.d(TAG, "Click vào sản phẩm: " + jewelry.getId());
                     Intent intent = new Intent(this, EditJewelryActivity.class);
-                    intent.putExtra("jewelry", jewelry);
+                    intent.putExtra("jewelry_id", jewelry.getId());
                     startActivity(intent);
                 }
             );
@@ -193,7 +193,8 @@ public class MainActivity extends AppCompatActivity {
      * Cập nhật giao diện với danh sách sản phẩm hoặc thông báo trống
      */
     private void loadJewelryData() {
-        showLoading();
+        runOnUiThread(() -> showLoading());
+        
         new Thread(() -> {
             try {
                 // Kiểm tra cấu trúc bảng trước khi lấy dữ liệu
