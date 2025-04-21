@@ -85,6 +85,9 @@ public class MainActivity extends AppCompatActivity implements ProductAdapter.On
         } else if (id == R.id.action_logout) {
             logout();
             return true;
+        } else if (id == R.id.action_search) {
+            showSearchDialog();
+            return true;
         }
 
         return super.onOptionsItemSelected(item);
@@ -168,5 +171,50 @@ public class MainActivity extends AppCompatActivity implements ProductAdapter.On
                 }
             });
         }
+    }
+
+    private void showSearchDialog() {
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+        builder.setTitle("Tìm kiếm sản phẩm");
+
+        // Tạo layout cho dialog
+        View dialogView = getLayoutInflater().inflate(R.layout.dialog_search_product, null);
+        builder.setView(dialogView);
+
+        // Lấy EditText từ layout
+        android.widget.EditText etSearch = dialogView.findViewById(R.id.etSearchProduct);
+
+        builder.setPositiveButton("Tìm kiếm", (dialog, which) -> {
+            String searchQuery = etSearch.getText().toString().trim();
+            searchProducts(searchQuery);
+        });
+
+        builder.setNegativeButton("Hủy", (dialog, which) -> dialog.dismiss());
+
+        android.app.AlertDialog dialog = builder.create();
+        dialog.show();
+    }
+
+    private void searchProducts(String query) {
+        if (query.isEmpty()) {
+            loadProducts();
+            return;
+        }
+
+        databaseHelper.searchProductsByName(query, new DatabaseHelper.OnProductsResultListener() {
+            @Override
+            public void onProductsLoaded(List<Product> products) {
+                runOnUiThread(() -> {
+                    productList.clear();
+                    productList.addAll(products);
+                    productAdapter.notifyDataSetChanged();
+                });
+            }
+
+            @Override
+            public void onProductsError(String error) {
+                runOnUiThread(() -> Toast.makeText(MainActivity.this, error, Toast.LENGTH_SHORT).show());
+            }
+        });
     }
 }

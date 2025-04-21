@@ -261,22 +261,54 @@ public class DatabaseHelper {
      */
     public void deleteProduct(int id, OnOperationResultListener listener) {
         executorService.execute(() -> {
-            try {
-                String query = "DELETE FROM Products WHERE id = ?";
+            try (Connection conn = getConnection();
+                 PreparedStatement pstmt = conn.prepareStatement("DELETE FROM products WHERE id = ?")) {
                 
-                try (Connection conn = getConnection();
-                     PreparedStatement stmt = conn.prepareStatement(query)) {
-                    
-                    stmt.setInt(1, id);
-                    if (stmt.executeUpdate() > 0) {
-                        listener.onOperationSuccess("Xóa sản phẩm thành công");
-                    } else {
-                        listener.onOperationFailed("Xóa sản phẩm thất bại");
-                    }
+                pstmt.setInt(1, id);
+                int affectedRows = pstmt.executeUpdate();
+                
+                if (affectedRows > 0) {
+                    listener.onOperationSuccess("Xóa sản phẩm thành công");
+                } else {
+                    listener.onOperationFailed("Không tìm thấy sản phẩm để xóa");
                 }
             } catch (SQLException e) {
                 Log.e(TAG, "Error deleting product", e);
                 listener.onOperationFailed("Lỗi kết nối database: " + e.getMessage());
+            }
+        });
+    }
+
+    /**
+     * Tìm kiếm sản phẩm theo tên
+     */
+    public void searchProductsByName(String query, OnProductsResultListener listener) {
+        executorService.execute(() -> {
+            try {
+                List<Product> products = new ArrayList<>();
+                String searchQuery = "SELECT * FROM products WHERE name LIKE ?";
+                
+                try (Connection conn = getConnection();
+                     PreparedStatement stmt = conn.prepareStatement(searchQuery)) {
+                    
+                    stmt.setString(1, "%" + query + "%");
+                    ResultSet rs = stmt.executeQuery();
+                    
+                    while (rs.next()) {
+                        Product product = new Product(
+                            rs.getInt("id"),
+                            rs.getString("name"),
+                            rs.getString("description"),
+                            rs.getDouble("price"),
+                            rs.getBytes("image")
+                        );
+                        products.add(product);
+                    }
+                    listener.onProductsLoaded(products);
+                }
+            } catch (SQLException e) {
+                Log.e(TAG, "Error searching products", e);
+                listener.onProductsError("Lỗi tìm kiếm sản phẩm: " + e.getMessage());
             }
         });
     }

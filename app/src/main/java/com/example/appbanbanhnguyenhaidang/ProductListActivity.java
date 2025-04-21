@@ -3,10 +3,12 @@ package com.example.appbanbanhnguyenhaidang;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Toast;
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -22,6 +24,7 @@ import java.util.List;
  * ProductListActivity - Hiển thị danh sách sản phẩm và xử lý các thao tác CRUD
  */
 public class ProductListActivity extends AppCompatActivity implements ProductAdapter.OnItemClickListener {
+    private static final String TAG = "ProductListActivity";
     private RecyclerView rvProducts;
     private ProductAdapter adapter;
     private List<Product> productList;
@@ -37,7 +40,9 @@ public class ProductListActivity extends AppCompatActivity implements ProductAda
         // Khởi tạo toolbar
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
-        getSupportActionBar().setTitle("Danh sách sản phẩm");
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setTitle("Danh sách sản phẩm");
+        }
 
         // Khởi tạo database helper
         databaseHelper = new DatabaseHelper(this);
@@ -69,6 +74,7 @@ public class ProductListActivity extends AppCompatActivity implements ProductAda
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
+        Log.d(TAG, "onCreateOptionsMenu called");
         getMenuInflater().inflate(R.menu.menu_main, menu);
         return true;
     }
