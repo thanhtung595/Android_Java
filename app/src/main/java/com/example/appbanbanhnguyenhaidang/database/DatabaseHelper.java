@@ -1,9 +1,11 @@
 package com.example.appbanbanhnguyenhaidang.database;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.AsyncTask;
 import android.util.Log;
 import com.example.appbanbanhnguyenhaidang.model.Account;
+import com.example.appbanbanhnguyenhaidang.model.CartItem;
 import com.example.appbanbanhnguyenhaidang.model.Product;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -58,6 +60,11 @@ public class DatabaseHelper {
         void onError(String error);
     }
 
+    public interface OnCartItemsLoadedListener {
+        void onCartItemsLoaded(List<CartItem> items);
+        void onError(String error);
+    }
+
     public DatabaseHelper(Context context) {
         this.context = context;
         this.executorService = Executors.newFixedThreadPool(4);
@@ -98,7 +105,16 @@ public class DatabaseHelper {
                 rs = stmt.executeQuery();
                 if (rs.next()) {
                     String role = rs.getString("role");
-                    Log.d(TAG, "Login successful. Role: " + role);
+                    int userId = rs.getInt("id");
+                    Log.d(TAG, "Login successful. Role: " + role + ", UserId: " + userId);
+                    
+                    // Lưu thông tin đăng nhập
+                    SharedPreferences.Editor editor = context.getSharedPreferences("login_pref", Context.MODE_PRIVATE).edit();
+                    editor.putString("username", username);
+                    editor.putString("role", role);
+                    editor.putInt("user_id", userId);
+                    editor.apply();
+                    
                     callback.onSuccess(role);
                 } else {
                     Log.d(TAG, "Login failed: Invalid credentials");
@@ -311,5 +327,171 @@ public class DatabaseHelper {
                 listener.onProductsError("Lỗi tìm kiếm sản phẩm: " + e.getMessage());
             }
         });
+    }
+
+    /**
+     * Thêm sản phẩm vào giỏ hàng
+     */
+    public void addToCart(int productId, OnOperationResultListener listener) {
+        executorService.execute(() -> {
+            try {
+                // Lấy user_id từ SharedPreferences
+                SharedPreferences preferences = context.getSharedPreferences("login_pref", Context.MODE_PRIVATE);
+                int userId = preferences.getInt("user_id", -1);
+                
+                if (userId == -1) {
+                    throw new SQLException("Người dùng chưa đăng nhập");
+                }
+
+                // Kiểm tra xem giỏ hàng đã tồn tại chưa
+                String checkCartQuery = "SELECT id FROM cart WHERE user_id = ?";
+                PreparedStatement checkCartStmt = getConnection().prepareStatement(checkCartQuery);
+                checkCartStmt.setInt(1, userId);
+                ResultSet cartResult = checkCartStmt.executeQuery();
+
+                int cartId;
+                if (cartResult.next()) {
+                    // Nếu giỏ hàng đã tồn tại, lấy cart_id
+                    cartId = cartResult.getInt("id");
+                } else {
+                    // Nếu giỏ hàng chưa tồn tại, tạo mới
+                    String createCartQuery = "INSERT INTO cart (user_id) VALUES (?)";
+                    PreparedStatement createCartStmt = getConnection().prepareStatement(createCartQuery, Statement.RETURN_GENERATED_KEYS);
+                    createCartStmt.setInt(1, userId);
+                    createCartStmt.executeUpdate();
+                    
+                    ResultSet generatedKeys = createCartStmt.getGeneratedKeys();
+                    if (generatedKeys.next()) {
+                        cartId = generatedKeys.getInt(1);
+                    } else {
+                        throw new SQLException("Không thể tạo giỏ hàng mới");
+                    }
+                }
+
+                // Kiểm tra xem sản phẩm đã có trong giỏ hàng chưa
+                String checkItemQuery = "SELECT id, quantity FROM cart_items WHERE cart_id = ? AND product_id = ?";
+                PreparedStatement checkItemStmt = getConnection().prepareStatement(checkItemQuery);
+                checkItemStmt.setInt(1, cartId);
+                checkItemStmt.setInt(2, productId);
+                ResultSet itemResult = checkItemStmt.executeQuery();
+
+                if (itemResult.next()) {
+                    // Nếu sản phẩm đã có trong giỏ hàng, cập nhật số lượng
+                    int itemId = itemResult.getInt("id");
+                    int currentQuantity = itemResult.getInt("quantity");
+                    String updateQuery = "UPDATE cart_items SET quantity = ? WHERE id = ?";
+                    PreparedStatement updateStmt = getConnection().prepareStatement(updateQuery);
+                    updateStmt.setInt(1, currentQuantity + 1);
+                    updateStmt.setInt(2, itemId);
+                    updateStmt.executeUpdate();
+                } else {
+                    // Nếu sản phẩm chưa có trong giỏ hàng, thêm mới
+                    String insertQuery = "INSERT INTO cart_items (cart_id, product_id, quantity) VALUES (?, ?, 1)";
+                    PreparedStatement insertStmt = getConnection().prepareStatement(insertQuery);
+                    insertStmt.setInt(1, cartId);
+                    insertStmt.setInt(2, productId);
+                    insertStmt.executeUpdate();
+                }
+
+                listener.onOperationSuccess("Đã thêm vào giỏ hàng");
+            } catch (SQLException e) {
+                Log.e(TAG, "Error adding to cart", e);
+                listener.onOperationFailed("Lỗi khi thêm vào giỏ hàng: " + e.getMessage());
+            }
+        });
+    }
+
+    /**
+     * Lấy danh sách sản phẩm trong giỏ hàng
+     */
+    public void getCartItems(OnCartItemsLoadedListener listener) {
+        executorService.execute(() -> {
+            try (Connection conn = getConnection()) {
+                String query = "SELECT ci.id as cart_item_id, ci.quantity, p.* " +
+                             "FROM cart_items ci " +
+                             "JOIN products p ON ci.product_id = p.id " +
+                             "JOIN cart c ON ci.cart_id = c.id " +
+                             "JOIN account a ON c.user_id = a.id " +
+                             "WHERE a.username = ?";
+
+                List<CartItem> items = new ArrayList<>();
+                try (PreparedStatement stmt = conn.prepareStatement(query)) {
+                    stmt.setString(1, getCurrentUsername());
+                    ResultSet rs = stmt.executeQuery();
+
+                    while (rs.next()) {
+                        Product product = new Product(
+                            rs.getInt("id"),
+                            rs.getString("name"),
+                            rs.getString("description"),
+                            rs.getDouble("price"),
+                            rs.getBytes("image")
+                        );
+                        CartItem item = new CartItem(
+                            rs.getInt("cart_item_id"),
+                            product,
+                            rs.getInt("quantity")
+                        );
+                        items.add(item);
+                    }
+                    listener.onCartItemsLoaded(items);
+                }
+            } catch (SQLException e) {
+                Log.e(TAG, "Error getting cart items", e);
+                listener.onError("Lỗi lấy giỏ hàng: " + e.getMessage());
+            }
+        });
+    }
+
+    /**
+     * Cập nhật số lượng sản phẩm trong giỏ hàng
+     */
+    public void updateCartItemQuantity(int cartItemId, int quantity, OnOperationResultListener listener) {
+        executorService.execute(() -> {
+            try (Connection conn = getConnection()) {
+                String query = "UPDATE cart_items SET quantity = ? WHERE id = ?";
+                try (PreparedStatement stmt = conn.prepareStatement(query)) {
+                    stmt.setInt(1, quantity);
+                    stmt.setInt(2, cartItemId);
+                    int affected = stmt.executeUpdate();
+                    if (affected > 0) {
+                        listener.onOperationSuccess("Cập nhật số lượng thành công");
+                    } else {
+                        listener.onOperationFailed("Không tìm thấy sản phẩm trong giỏ hàng");
+                    }
+                }
+            } catch (SQLException e) {
+                Log.e(TAG, "Error updating cart item quantity", e);
+                listener.onOperationFailed("Lỗi cập nhật số lượng: " + e.getMessage());
+            }
+        });
+    }
+
+    /**
+     * Xóa sản phẩm khỏi giỏ hàng
+     */
+    public void removeFromCart(int cartItemId, OnOperationResultListener listener) {
+        executorService.execute(() -> {
+            try (Connection conn = getConnection()) {
+                String query = "DELETE FROM cart_items WHERE id = ?";
+                try (PreparedStatement stmt = conn.prepareStatement(query)) {
+                    stmt.setInt(1, cartItemId);
+                    int affected = stmt.executeUpdate();
+                    if (affected > 0) {
+                        listener.onOperationSuccess("Đã xóa sản phẩm khỏi giỏ hàng");
+                    } else {
+                        listener.onOperationFailed("Không tìm thấy sản phẩm trong giỏ hàng");
+                    }
+                }
+            } catch (SQLException e) {
+                Log.e(TAG, "Error removing from cart", e);
+                listener.onOperationFailed("Lỗi xóa sản phẩm: " + e.getMessage());
+            }
+        });
+    }
+
+    private String getCurrentUsername() {
+        SharedPreferences preferences = context.getSharedPreferences("login_pref", Context.MODE_PRIVATE);
+        return preferences.getString("username", "");
     }
 } 

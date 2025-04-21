@@ -44,6 +44,8 @@
             android:name=".AddEditProductActivity"
             android:exported="false" />
 
+        <activity android:name=".CartActivity" />
+
     </application>
 
 </manifest>

@@ -28,6 +28,7 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.ProductV
         void onItemClick(Product product);
         void onEditClick(Product product);
         void onDeleteClick(Product product);
+        void onAddToCartClick(Product product);
     }
 
     public ProductAdapter(Context context, List<Product> productList, OnItemClickListener listener, boolean isAdmin) {
@@ -57,18 +58,21 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.ProductV
             holder.ivProductImage.setImageBitmap(bitmap);
         }
 
-        // Hiển thị nút sửa/xóa cho admin
+        // Hiển thị nút sửa/xóa cho admin, nút thêm vào giỏ hàng cho user
         if (isAdmin) {
             holder.btnEdit.setVisibility(View.VISIBLE);
             holder.btnDelete.setVisibility(View.VISIBLE);
+            holder.btnAddToCart.setVisibility(View.GONE);
         } else {
             holder.btnEdit.setVisibility(View.GONE);
             holder.btnDelete.setVisibility(View.GONE);
+            holder.btnAddToCart.setVisibility(View.VISIBLE);
         }
 
         holder.itemView.setOnClickListener(v -> listener.onItemClick(product));
         holder.btnEdit.setOnClickListener(v -> listener.onEditClick(product));
         holder.btnDelete.setOnClickListener(v -> listener.onDeleteClick(product));
+        holder.btnAddToCart.setOnClickListener(v -> listener.onAddToCartClick(product));
     }
 
     @Override
@@ -88,6 +92,7 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.ProductV
         TextView tvProductPrice;
         ImageButton btnEdit;
         ImageButton btnDelete;
+        ImageButton btnAddToCart;
 
         public ProductViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -97,6 +102,7 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.ProductV
             tvProductPrice = itemView.findViewById(R.id.tvProductPrice);
             btnEdit = itemView.findViewById(R.id.btnEdit);
             btnDelete = itemView.findViewById(R.id.btnDelete);
+            btnAddToCart = itemView.findViewById(R.id.btnAddToCart);
         }
     }
 } 

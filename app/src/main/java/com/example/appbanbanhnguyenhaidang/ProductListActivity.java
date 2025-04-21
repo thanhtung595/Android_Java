@@ -168,6 +168,11 @@ public class ProductListActivity extends AppCompatActivity implements ProductAda
     }
 
     @Override
+    public void onAddToCartClick(Product product) {
+        // Không làm gì cả vì chức năng giỏ hàng được xử lý ở MainActivity
+    }
+
+    @Override
     protected void onResume() {
         super.onResume();
         loadProducts();

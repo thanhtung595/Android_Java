@@ -9,6 +9,13 @@
         app:showAsAction="always" />
 
     <item
+        android:id="@+id/action_cart"
+        android:icon="@android:drawable/ic_menu_more"
+        android:title="Giỏ hàng"
+        android:visible="false"
+        app:showAsAction="always" />
+
+    <item
         android:id="@+id/action_refresh"
         android:icon="@android:drawable/ic_popup_sync"
         android:title="@string/refresh"

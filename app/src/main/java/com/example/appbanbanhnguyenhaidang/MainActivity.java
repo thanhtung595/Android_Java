@@ -69,6 +69,7 @@ public class MainActivity extends AppCompatActivity implements ProductAdapter.On
         getMenuInflater().inflate(R.menu.menu_main, menu);
         // Ẩn các menu item không cần thiết nếu không phải admin
         menu.findItem(R.id.action_settings).setVisible(isAdmin);
+        menu.findItem(R.id.action_cart).setVisible(!isAdmin);
         return true;
     }
 
@@ -84,6 +85,9 @@ public class MainActivity extends AppCompatActivity implements ProductAdapter.On
             return true;
         } else if (id == R.id.action_logout) {
             logout();
+            return true;
+        } else if (id == R.id.action_cart) {
+            startActivity(new Intent(this, CartActivity.class));
             return true;
         } else if (id == R.id.action_search) {
             showSearchDialog();
@@ -167,6 +171,27 @@ public class MainActivity extends AppCompatActivity implements ProductAdapter.On
                 public void onOperationFailed(String error) {
                     runOnUiThread(() -> {
                         Toast.makeText(MainActivity.this, "Error deleting product: " + error, Toast.LENGTH_SHORT).show();
+                    });
+                }
+            });
+        }
+    }
+
+    @Override
+    public void onAddToCartClick(Product product) {
+        if (!isAdmin) {
+            databaseHelper.addToCart(product.getId(), new DatabaseHelper.OnOperationResultListener() {
+                @Override
+                public void onOperationSuccess(String message) {
+                    runOnUiThread(() -> {
+                        Toast.makeText(MainActivity.this, "Đã thêm " + product.getName() + " vào giỏ hàng", Toast.LENGTH_SHORT).show();
+                    });
+                }
+
+                @Override
+                public void onOperationFailed(String error) {
+                    runOnUiThread(() -> {
+                        Toast.makeText(MainActivity.this, "Lỗi: " + error, Toast.LENGTH_SHORT).show();
                     });
                 }
             });
