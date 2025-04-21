@@ -13,6 +13,11 @@
         android:icon="@drawable/ic_cart"
         android:title="Cart"
         app:showAsAction="always" />
+
+    <item
+        android:id="@+id/action_orders"
+        android:title="Hóa đơn mua hàng"
+        app:showAsAction="never" />
         
     <item
         android:id="@+id/action_logout"

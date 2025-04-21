@@ -117,8 +117,6 @@ public class LoginActivity extends AppCompatActivity {
                 Log.e(TAG, "Lỗi khi lấy account_id: " + e.getMessage(), e);
             }
         }).start();
-        
-        editor.apply();
     }
 
     /**

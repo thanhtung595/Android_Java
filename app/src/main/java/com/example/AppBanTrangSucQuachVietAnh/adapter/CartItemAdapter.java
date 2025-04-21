@@ -14,18 +14,20 @@ import com.example.AppBanTrangSucQuachVietAnh.R;
 import com.example.AppBanTrangSucQuachVietAnh.model.CartItem;
 import com.example.AppBanTrangSucQuachVietAnh.model.Jewelry;
 import java.util.List;
+import java.text.NumberFormat;
+import java.util.Locale;
 
 public class CartItemAdapter extends RecyclerView.Adapter<CartItemAdapter.CartItemViewHolder> {
     private List<CartItem> cartItems;
     private Context context;
-    private OnCartItemClickListener listener;
+    private OnItemClickListener listener;
 
-    public interface OnCartItemClickListener {
-        void onQuantityChange(CartItem cartItem, int newQuantity);
-        void onRemoveItem(CartItem cartItem);
+    public interface OnItemClickListener {
+        void onItemClick(CartItem item);
+        void onRemoveClick(CartItem item);
     }
 
-    public CartItemAdapter(Context context, List<CartItem> cartItems, OnCartItemClickListener listener) {
+    public CartItemAdapter(Context context, List<CartItem> cartItems, OnItemClickListener listener) {
         this.context = context;
         this.cartItems = cartItems;
         this.listener = listener;
@@ -72,13 +74,23 @@ public class CartItemAdapter extends RecyclerView.Adapter<CartItemAdapter.CartIt
             btnRemove = itemView.findViewById(R.id.btnRemove);
         }
 
-        public void bind(CartItem item, OnCartItemClickListener listener) {
+        public void bind(CartItem item, OnItemClickListener listener) {
             Jewelry product = item.getProduct();
             if (product != null) {
                 productName.setText(product.getName());
-                productPrice.setText(String.format("$%.2f", item.getPrice()));
+                
+                // Sử dụng NumberFormat để định dạng tiền tệ
+                NumberFormat format = NumberFormat.getCurrencyInstance(new Locale("vi", "VN"));
+                
+                // Hiển thị giá của sản phẩm
+                productPrice.setText(format.format(item.getPrice()));
+                
+                // Hiển thị số lượng
                 quantity.setText(String.valueOf(item.getQuantity()));
-                totalPrice.setText(String.format("$%.2f", item.getPrice() * item.getQuantity()));
+                
+                // Tính và hiển thị tổng tiền cho sản phẩm này
+                double itemTotal = item.getPrice() * item.getQuantity();
+                totalPrice.setText(format.format(itemTotal));
 
                 // Convert byte array to bitmap and set to ImageView
                 byte[] imageData = product.getImage();
@@ -89,12 +101,9 @@ public class CartItemAdapter extends RecyclerView.Adapter<CartItemAdapter.CartIt
                     productImage.setImageResource(R.drawable.placeholder);
                 }
 
-                // Xử lý sự kiện click nút xóa
-                btnRemove.setOnClickListener(v -> {
-                    if (listener != null) {
-                        listener.onRemoveItem(item);
-                    }
-                });
+                // Xử lý sự kiện click
+                itemView.setOnClickListener(v -> listener.onItemClick(item));
+                btnRemove.setOnClickListener(v -> listener.onRemoveClick(item));
             }
         }
     }
