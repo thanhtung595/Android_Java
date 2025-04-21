@@ -1,6 +1,7 @@
 package com.example.appbanbanhnguyenhaidang;
 
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -31,6 +32,7 @@ public class MainActivity extends AppCompatActivity implements ProductAdapter.On
     private DatabaseHelper databaseHelper;
     private FloatingActionButton fabAdd;
     private boolean isAdmin = false;
+    private SharedPreferences preferences;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -50,6 +52,7 @@ public class MainActivity extends AppCompatActivity implements ProductAdapter.On
         productList = new ArrayList<>();
         productAdapter = new ProductAdapter(this, productList, this, isAdmin);
         databaseHelper = new DatabaseHelper(this);
+        preferences = getSharedPreferences("user_preferences", MODE_PRIVATE);
 
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         recyclerView.setAdapter(productAdapter);
@@ -83,11 +86,23 @@ public class MainActivity extends AppCompatActivity implements ProductAdapter.On
         } else if (id == R.id.action_settings) {
             Toast.makeText(this, "Settings clicked", Toast.LENGTH_SHORT).show();
             return true;
-        } else if (id == R.id.action_logout) {
-            logout();
-            return true;
         } else if (id == R.id.action_cart) {
             startActivity(new Intent(this, CartActivity.class));
+            return true;
+        } else if (id == R.id.action_orders) {
+            startActivity(new Intent(this, OrdersActivity.class));
+            return true;
+        } else if (id == R.id.action_logout) {
+            // Xóa thông tin đăng nhập
+            SharedPreferences.Editor editor = preferences.edit();
+            editor.clear();
+            editor.apply();
+
+            // Chuyển về màn hình đăng nhập
+            Intent intent = new Intent(this, LoginActivity.class);
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            startActivity(intent);
+            finish();
             return true;
         } else if (id == R.id.action_search) {
             showSearchDialog();
@@ -95,14 +110,6 @@ public class MainActivity extends AppCompatActivity implements ProductAdapter.On
         }
 
         return super.onOptionsItemSelected(item);
-    }
-
-    private void logout() {
-        // Chuyển về màn hình đăng nhập
-        Intent intent = new Intent(this, LoginActivity.class);
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        startActivity(intent);
-        finish();
     }
 
     @Override
@@ -241,5 +248,13 @@ public class MainActivity extends AppCompatActivity implements ProductAdapter.On
                 runOnUiThread(() -> Toast.makeText(MainActivity.this, error, Toast.LENGTH_SHORT).show());
             }
         });
+    }
+
+    private void logout() {
+        // Chuyển về màn hình đăng nhập
+        Intent intent = new Intent(this, LoginActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
+        finish();
     }
 }

@@ -3,9 +3,13 @@ package com.example.appbanbanhnguyenhaidang.database;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.AsyncTask;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import com.example.appbanbanhnguyenhaidang.model.Account;
 import com.example.appbanbanhnguyenhaidang.model.CartItem;
+import com.example.appbanbanhnguyenhaidang.model.Order;
+import com.example.appbanbanhnguyenhaidang.model.OrderItem;
 import com.example.appbanbanhnguyenhaidang.model.Product;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -62,6 +66,16 @@ public class DatabaseHelper {
 
     public interface OnCartItemsLoadedListener {
         void onCartItemsLoaded(List<CartItem> items);
+        void onError(String error);
+    }
+
+    public interface OnOrdersLoadedListener {
+        void onOrdersLoaded(List<Order> orders);
+        void onError(String error);
+    }
+
+    public interface OnOrderItemsLoadedListener {
+        void onOrderItemsLoaded(List<OrderItem> items);
         void onError(String error);
     }
 
@@ -486,6 +500,196 @@ public class DatabaseHelper {
             } catch (SQLException e) {
                 Log.e(TAG, "Error removing from cart", e);
                 listener.onOperationFailed("Lỗi xóa sản phẩm: " + e.getMessage());
+            }
+        });
+    }
+
+    /**
+     * Tạo đơn hàng mới từ giỏ hàng
+     */
+    public void createOrder(OnOperationResultListener listener) {
+        executorService.execute(() -> {
+            try {
+                // Lấy thông tin giỏ hàng
+                String getCartQuery = "SELECT c.id as cart_id, a.id as user_id FROM cart c " +
+                                    "JOIN account a ON c.user_id = a.id " +
+                                    "WHERE a.username = ?";
+                PreparedStatement getCartStmt = getConnection().prepareStatement(getCartQuery);
+                getCartStmt.setString(1, getCurrentUsername());
+                ResultSet cartRs = getCartStmt.executeQuery();
+
+                if (!cartRs.next()) {
+                    listener.onOperationFailed("Không tìm thấy giỏ hàng");
+                    return;
+                }
+
+                int cartId = cartRs.getInt("cart_id");
+                int userId = cartRs.getInt("user_id");
+
+                // Lấy danh sách sản phẩm trong giỏ hàng
+                String getCartItemsQuery = "SELECT ci.id as cart_item_id, ci.quantity, p.* " +
+                                         "FROM cart_items ci " +
+                                         "JOIN products p ON ci.product_id = p.id " +
+                                         "WHERE ci.cart_id = ?";
+                PreparedStatement getCartItemsStmt = getConnection().prepareStatement(getCartItemsQuery);
+                getCartItemsStmt.setInt(1, cartId);
+                ResultSet itemsRs = getCartItemsStmt.executeQuery();
+
+                List<CartItem> cartItems = new ArrayList<>();
+                double totalAmount = 0;
+
+                while (itemsRs.next()) {
+                    Product product = new Product(
+                        itemsRs.getInt("id"),
+                        itemsRs.getString("name"),
+                        itemsRs.getString("description"),
+                        itemsRs.getDouble("price"),
+                        itemsRs.getBytes("image")
+                    );
+                    CartItem item = new CartItem(
+                        itemsRs.getInt("cart_item_id"),
+                        product,
+                        itemsRs.getInt("quantity")
+                    );
+                    cartItems.add(item);
+                    totalAmount += product.getPrice() * item.getQuantity();
+                }
+
+                if (cartItems.isEmpty()) {
+                    listener.onOperationFailed("Giỏ hàng trống");
+                    return;
+                }
+
+                // Tạo đơn hàng mới
+                String createOrderQuery = "INSERT INTO orders (user_id, total_amount) VALUES (?, ?)";
+                PreparedStatement createOrderStmt = getConnection().prepareStatement(createOrderQuery, Statement.RETURN_GENERATED_KEYS);
+                createOrderStmt.setInt(1, userId);
+                createOrderStmt.setDouble(2, totalAmount);
+                createOrderStmt.executeUpdate();
+
+                ResultSet generatedKeys = createOrderStmt.getGeneratedKeys();
+                if (!generatedKeys.next()) {
+                    throw new SQLException("Không thể tạo đơn hàng");
+                }
+                int orderId = generatedKeys.getInt(1);
+
+                // Thêm chi tiết đơn hàng
+                String insertOrderItemQuery = "INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)";
+                PreparedStatement insertOrderItemStmt = getConnection().prepareStatement(insertOrderItemQuery);
+
+                for (CartItem item : cartItems) {
+                    if (item.getProduct() == null) {
+                        throw new SQLException("Sản phẩm không tồn tại");
+                    }
+                    insertOrderItemStmt.setInt(1, orderId);
+                    insertOrderItemStmt.setInt(2, item.getProduct().getId());
+                    insertOrderItemStmt.setInt(3, item.getQuantity());
+                    insertOrderItemStmt.setDouble(4, item.getProduct().getPrice());
+                    insertOrderItemStmt.addBatch();
+                }
+                insertOrderItemStmt.executeBatch();
+
+                // Xóa giỏ hàng
+                String deleteCartItemsQuery = "DELETE FROM cart_items WHERE cart_id = ?";
+                PreparedStatement deleteCartItemsStmt = getConnection().prepareStatement(deleteCartItemsQuery);
+                deleteCartItemsStmt.setInt(1, cartId);
+                deleteCartItemsStmt.executeUpdate();
+
+                listener.onOperationSuccess("Đặt hàng thành công");
+            } catch (SQLException e) {
+                Log.e(TAG, "Error creating order", e);
+                listener.onOperationFailed("Lỗi khi đặt hàng: " + e.getMessage());
+            }
+        });
+    }
+
+    /**
+     * Lấy danh sách đơn hàng của người dùng
+     */
+    public void getOrders(OnOrdersLoadedListener listener) {
+        executorService.execute(() -> {
+            try {
+                // Lấy user_id từ SharedPreferences
+                SharedPreferences preferences = context.getSharedPreferences("login_pref", Context.MODE_PRIVATE);
+                int userId = preferences.getInt("user_id", -1);
+                
+                if (userId == -1) {
+                    throw new SQLException("Người dùng chưa đăng nhập");
+                }
+
+                String query = "SELECT * FROM orders WHERE user_id = ? ORDER BY order_date DESC";
+                PreparedStatement stmt = getConnection().prepareStatement(query);
+                stmt.setInt(1, userId);
+                ResultSet rs = stmt.executeQuery();
+
+                List<Order> orders = new ArrayList<>();
+                while (rs.next()) {
+                    Order order = new Order(
+                        rs.getInt("id"),
+                        rs.getInt("user_id"),
+                        rs.getTimestamp("order_date"),
+                        rs.getDouble("total_amount"),
+                        rs.getString("status")
+                    );
+                    orders.add(order);
+                }
+                
+                // Chuyển callback về main thread
+                new Handler(Looper.getMainLooper()).post(() -> {
+                    listener.onOrdersLoaded(orders);
+                });
+            } catch (SQLException e) {
+                Log.e(TAG, "Error getting orders", e);
+                // Chuyển callback về main thread
+                new Handler(Looper.getMainLooper()).post(() -> {
+                    listener.onError("Lỗi khi lấy danh sách đơn hàng: " + e.getMessage());
+                });
+            }
+        });
+    }
+
+    /**
+     * Lấy chi tiết đơn hàng
+     */
+    public void getOrderItems(int orderId, OnOrderItemsLoadedListener listener) {
+        executorService.execute(() -> {
+            try {
+                String query = "SELECT oi.*, p.* FROM order_items oi " +
+                             "JOIN products p ON oi.product_id = p.id " +
+                             "WHERE oi.order_id = ?";
+                PreparedStatement stmt = getConnection().prepareStatement(query);
+                stmt.setInt(1, orderId);
+                ResultSet rs = stmt.executeQuery();
+
+                List<OrderItem> items = new ArrayList<>();
+                while (rs.next()) {
+                    Product product = new Product(
+                        rs.getInt("product_id"),
+                        rs.getString("name"),
+                        rs.getString("description"),
+                        rs.getDouble("price"),
+                        rs.getBytes("image")
+                    );
+                    OrderItem item = new OrderItem(
+                        rs.getInt("id"),
+                        rs.getInt("order_id"),
+                        product,
+                        rs.getInt("quantity"),
+                        rs.getDouble("price")
+                    );
+                    items.add(item);
+                }
+                
+                // Chuyển callback về main thread
+                new Handler(Looper.getMainLooper()).post(() -> {
+                    listener.onOrderItemsLoaded(items);
+                });
+            } catch (SQLException e) {
+                Log.e(TAG, "Error getting order items", e);
+                // Chuyển callback về main thread
+                new Handler(Looper.getMainLooper()).post(() -> {
+                    listener.onError("Lỗi khi lấy chi tiết đơn hàng: " + e.getMessage());
+                });
             }
         });
     }

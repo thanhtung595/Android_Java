@@ -1,5 +1,6 @@
 package com.example.appbanbanhnguyenhaidang;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.MenuItem;
 import android.view.View;
@@ -34,6 +35,10 @@ public class CartActivity extends AppCompatActivity implements CartAdapter.CartI
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_cart);
 
+        setupViews();
+    }
+
+    private void setupViews() {
         // Khởi tạo toolbar
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
@@ -42,29 +47,28 @@ public class CartActivity extends AppCompatActivity implements CartAdapter.CartI
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         }
 
-        // Khởi tạo views
+        // Khởi tạo RecyclerView
         rvCartItems = findViewById(R.id.rvCartItems);
-        tvEmptyCart = findViewById(R.id.tvEmptyCart);
+        rvCartItems.setLayoutManager(new LinearLayoutManager(this));
+        cartItems = new ArrayList<>();
+        cartAdapter = new CartAdapter(this, cartItems, this);
+        rvCartItems.setAdapter(cartAdapter);
+
+        // Khởi tạo TextView tổng tiền
         tvTotal = findViewById(R.id.tvTotal);
+
+        // Khởi tạo TextView giỏ hàng trống
+        tvEmptyCart = findViewById(R.id.tvEmptyCart);
+
+        // Khởi tạo nút thanh toán
         btnCheckout = findViewById(R.id.btnCheckout);
+        btnCheckout.setOnClickListener(v -> checkout());
 
         // Khởi tạo database helper
         databaseHelper = new DatabaseHelper(this);
 
-        // Khởi tạo RecyclerView
-        cartItems = new ArrayList<>();
-        cartAdapter = new CartAdapter(this, cartItems, this);
-        rvCartItems.setLayoutManager(new LinearLayoutManager(this));
-        rvCartItems.setAdapter(cartAdapter);
-
-        // Load giỏ hàng
+        // Tải giỏ hàng
         loadCartItems();
-
-        // Xử lý sự kiện thanh toán
-        btnCheckout.setOnClickListener(v -> {
-            // TODO: Implement checkout functionality
-            Toast.makeText(this, "Tính năng thanh toán sẽ được cập nhật sau", Toast.LENGTH_SHORT).show();
-        });
     }
 
     private void loadCartItems() {
@@ -103,6 +107,30 @@ public class CartActivity extends AppCompatActivity implements CartAdapter.CartI
             total += item.getProduct().getPrice() * item.getQuantity();
         }
         tvTotal.setText(String.format("Tổng tiền: %,.0f VNĐ", total));
+    }
+
+    private void checkout() {
+        if (cartItems.isEmpty()) {
+            Toast.makeText(this, "Giỏ hàng trống", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        databaseHelper.createOrder(new DatabaseHelper.OnOperationResultListener() {
+            @Override
+            public void onOperationSuccess(String message) {
+                runOnUiThread(() -> {
+                    Toast.makeText(CartActivity.this, message, Toast.LENGTH_SHORT).show();
+                    // Chuyển đến màn hình đơn hàng
+                    startActivity(new Intent(CartActivity.this, OrdersActivity.class));
+                    finish();
+                });
+            }
+
+            @Override
+            public void onOperationFailed(String error) {
+                runOnUiThread(() -> Toast.makeText(CartActivity.this, error, Toast.LENGTH_SHORT).show());
+            }
+        });
     }
 
     @Override

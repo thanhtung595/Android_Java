@@ -45,6 +45,8 @@
             android:exported="false" />
 
         <activity android:name=".CartActivity" />
+        <activity android:name=".OrdersActivity" />
+        <activity android:name=".OrderDetailActivity" />
 
     </application>
 
