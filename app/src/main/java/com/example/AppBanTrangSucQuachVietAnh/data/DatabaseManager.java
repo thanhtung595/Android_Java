@@ -133,8 +133,11 @@ public class DatabaseManager {
                 }
             }
 
-            try (Statement stmt = connection.createStatement();
-                 ResultSet rs = stmt.executeQuery(sql)) {
+            Statement stmt = null;
+            ResultSet rs = null;
+            try {
+                stmt = connection.createStatement();
+                rs = stmt.executeQuery(sql);
                 
                 while (rs.next()) {
                     try {
@@ -159,6 +162,17 @@ public class DatabaseManager {
                 Log.d(TAG, "Lấy danh sách sản phẩm thành công: " + jewelryList.size() + " sản phẩm");
             } catch (SQLException e) {
                 Log.e(TAG, "Lỗi lấy danh sách sản phẩm: " + e.getMessage(), e);
+            } finally {
+                try {
+                    if (rs != null) {
+                        rs.close();
+                    }
+                    if (stmt != null) {
+                        stmt.close();
+                    }
+                } catch (SQLException e) {
+                    Log.e(TAG, "Lỗi đóng ResultSet hoặc Statement: " + e.getMessage(), e);
+                }
             }
         }
         
